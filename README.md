@@ -23,7 +23,7 @@ Custom multi-company invoice, quotation, and receipt generator built with Next.j
 - Customer document history page.
 - Dashboard metrics and recent documents.
 - Super admin overview under `/admin` for tenant, user, document, activity, storage, and health summaries.
-- Selectable document templates: `classic`, `modern`, and `compact`.
+- Selectable document templates: `classic` and `clean`.
 
 ## Setup
 
@@ -137,7 +137,7 @@ curl http://localhost:3000/api/health/db
 
 If login/register shows a database setup message, check:
 
-- `.env` exists in `/Users/min/work/Invoice-app`.
+- `.env` exists in the project root.
 - `DATABASE_URL` starts with `mysql://` or `mysqls://`.
 - MySQL is running on the host and port in `DATABASE_URL`.
 - The `invoice_app` database exists.
@@ -158,9 +158,11 @@ If `SUPER_ADMIN_EMAIL` and `SUPER_ADMIN_PASSWORD` are set before `yarn seed`, th
 yarn install
 yarn dev
 yarn build
+yarn start
 yarn db:health
 yarn prisma generate
 yarn prisma migrate dev
+yarn prisma migrate deploy
 yarn seed
 ```
 
@@ -222,13 +224,74 @@ Company assets are stored as file paths/URLs only. MySQL does not store base64 i
 
 ## Hostinger Node.js Notes
 
-- This app uses `output: "standalone"` in `next.config.ts`.
+- Use Node.js 20 LTS or newer if your Hostinger plan offers it. The app declares `node >=20.11.0` in `package.json`.
+- Confirm that your exact Hostinger product has Node.js app support. Hostinger's public support docs route Node.js apps to VPS/CloudPanel-style hosting when standard Web/Cloud hosting does not provide root access.
+- This app uses `output: "standalone"` in `next.config.ts`; `yarn start` runs the generated standalone server with `node .next/standalone/server.js`.
 - It avoids Vercel-only storage and serverless-only assumptions.
-- Ensure the deployed Node.js process can write to the configured PDF folder, or move PDF storage to a persistent writable folder and expose it through static routing.
+- Set the Hostinger Node.js app startup command to `yarn start`.
 - Set `NEXT_PUBLIC_APP_URL` to your production URL so WhatsApp messages include correct links.
+- Ensure the deployed Node.js process can write to `public/uploads`. The app auto-creates nested upload/PDF folders when saving files.
 - Back up both MySQL and `public/uploads`. The database contains document metadata, while generated PDFs, logos, and chops live on disk.
-- Run Prisma commands during deployment as needed: `yarn prisma generate` and `yarn prisma migrate deploy`.
+- Do not run `yarn seed` automatically in production. Use it manually only if you intentionally want to create demo data or the first super admin from `SUPER_ADMIN_*` variables.
 - Future storage migration path: implement `S3StorageProvider` or `CloudflareR2StorageProvider` behind `lib/storage` without changing invoice/PDF/logo business logic.
+
+### Production Environment Variables
+
+Configure these in Hostinger, not in git:
+
+```env
+DATABASE_URL="mysql://USER:PASSWORD@HOST:3306/DATABASE"
+AUTH_SECRET="a-long-random-production-secret"
+NEXT_PUBLIC_APP_URL="https://your-domain.com"
+```
+
+Optional only when manually running `yarn seed`:
+
+```env
+SUPER_ADMIN_EMAIL="owner@example.com"
+SUPER_ADMIN_PASSWORD="replace-with-a-strong-password"
+SUPER_ADMIN_NAME="System Owner"
+```
+
+Generate a strong `AUTH_SECRET` locally with:
+
+```bash
+openssl rand -base64 32
+```
+
+### Production Deployment Flow
+
+After uploading the repository to Hostinger and configuring environment variables:
+
+```bash
+corepack enable
+yarn install --immutable
+yarn prisma generate
+yarn prisma migrate deploy
+yarn build
+yarn start
+```
+
+Use `yarn prisma migrate deploy` for production databases. Do not use `yarn prisma migrate dev` in production.
+
+### Production MySQL Notes
+
+- Create a production MySQL database and user in Hostinger.
+- Grant only the privileges needed for this app database.
+- Use the Hostinger MySQL host, port, database name, username, and password in `DATABASE_URL`.
+- Keep regular MySQL backups before and after deployments that run migrations.
+
+### GitHub Safety
+
+The repository intentionally ignores:
+
+- `.env` and local env variants
+- `node_modules`
+- `.next`
+- `public/uploads`
+- `public/generated-pdfs`
+
+Only `.gitkeep` placeholders for runtime folders should be committed. Generated PDFs, uploaded logos, uploaded chops, and local database credentials should never be committed.
 
 ## Reference PDF
 

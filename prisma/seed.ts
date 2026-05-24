@@ -258,7 +258,7 @@ async function main() {
   console.log({
     company: company.name,
     user: "demo@example.com",
-    password: "password123",
+    demoPassword: "see README demo login section",
     customer: customer.name,
     quotation: quotation.quotationNumber,
     invoice: invoice.invoiceNumber,

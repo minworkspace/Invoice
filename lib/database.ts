@@ -142,7 +142,5 @@ export async function checkDatabaseHealth(): Promise<DatabaseHealth> {
       userCount: null,
       error: databaseErrorDetail(error)
     };
-  } finally {
-    await prisma.$disconnect();
   }
 }

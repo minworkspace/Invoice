@@ -9,11 +9,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const user = await requireUser();
   const { id } = await params;
 
-  await generateDocumentPdf({
-    companyId: user.companyId,
-    documentType: DocumentType.INVOICE,
-    documentId: id
-  });
+  try {
+    await generateDocumentPdf({
+      companyId: user.companyId,
+      documentType: DocumentType.INVOICE,
+      documentId: id
+    });
+  } catch (error) {
+    console.error("Invoice PDF generation failed", { invoiceId: id, error });
+    return NextResponse.redirect(new URL(`/invoices/${id}?error=pdf-generation`, request.url), 303);
+  }
 
   return NextResponse.redirect(new URL(`/invoices/${id}?pdf=generated`, request.url), 303);
 }
