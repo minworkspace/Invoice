@@ -274,6 +274,40 @@ yarn start
 
 Use `yarn prisma migrate deploy` for production databases. Do not use `yarn prisma migrate dev` in production.
 
+### Standalone Output Contents
+
+After `yarn build`, the deployable Hostinger folder is `.next/standalone`.
+
+The post-build deploy prep now makes sure this folder includes:
+
+- `server.js`
+- `package.json`
+- `node_modules`
+- `node_modules/prisma`
+- `node_modules/@prisma`
+- `public`
+- `tmp`
+- `prisma/schema.prisma`
+- `prisma/migrations`
+- `.next/static`
+
+It also removes copied env files from the standalone output, so `.env` and `.env.example` are not shipped as deployment artifacts.
+
+### Running Prisma Migrations On Hostinger
+
+If you deploy from the standalone output folder, run the Prisma commands from inside that deployed app directory, the same place that contains `server.js` and `package.json`.
+
+Example production flow inside the deployed folder:
+
+```bash
+yarn install
+yarn prisma generate
+yarn prisma migrate deploy
+yarn start
+```
+
+`yarn prisma migrate deploy` needs the deployed `prisma/schema.prisma` and `prisma/migrations`, so those are copied into `.next/standalone/prisma` during `yarn build`.
+
 ### Production MySQL Notes
 
 - Create a production MySQL database and user in Hostinger.
