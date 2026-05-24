@@ -1,0 +1,5 @@
+ALTER TABLE `QuotationItem`
+ADD COLUMN `showQuantity` BOOLEAN NOT NULL DEFAULT true;
+
+ALTER TABLE `InvoiceItem`
+ADD COLUMN `showQuantity` BOOLEAN NOT NULL DEFAULT true;

@@ -1,0 +1,65 @@
+import { DocumentType } from "@prisma/client";
+import { NextResponse } from "next/server";
+import { normalizeDocumentTemplateKey } from "@/components/document-templates/template-registry";
+import { requireUser } from "@/lib/auth";
+import { reserveDocumentNumberTx } from "@/lib/numbering";
+import { prisma } from "@/lib/prisma";
+
+export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const user = await requireUser();
+  const { id } = await params;
+
+  const receipt = await prisma.$transaction(async (tx) => {
+    const invoice = await tx.invoice.findFirst({
+      where: { id, companyId: user.companyId },
+      include: { receipt: true }
+    });
+
+    if (!invoice) throw new Error("Invoice not found.");
+    if (invoice.receipt) return invoice.receipt;
+
+    const receiptNumber = await reserveDocumentNumberTx(tx, user.companyId, DocumentType.RECEIPT);
+    const amount = invoice.paidAmount.toString() === "0" ? invoice.total : invoice.paidAmount;
+    const settings = await tx.companySettings.findUnique({
+      where: { companyId: user.companyId },
+      select: { defaultReceiptTemplate: true }
+    });
+
+    const newReceipt = await tx.receipt.create({
+      data: {
+        companyId: user.companyId,
+        customerId: invoice.customerId,
+        invoiceId: invoice.id,
+        receiptNumber,
+        status: "PAID",
+        receiptDate: new Date(),
+        amount,
+        paymentMethod: "Manual",
+        notes: `Receipt generated from invoice ${invoice.invoiceNumber}.`,
+        templateKey: normalizeDocumentTemplateKey(settings?.defaultReceiptTemplate),
+        payments: {
+          create: {
+            companyId: user.companyId,
+            customerId: invoice.customerId,
+            invoiceId: invoice.id,
+            amount,
+            paidAt: new Date(),
+            method: "Manual"
+          }
+        }
+      }
+    });
+
+    await tx.invoice.update({
+      where: { id: invoice.id },
+      data: {
+        paidAmount: amount,
+        status: "PAID"
+      }
+    });
+
+    return newReceipt;
+  });
+
+  return NextResponse.redirect(new URL(`/receipts/${receipt.id}?created=from-invoice`, request.url), 303);
+}

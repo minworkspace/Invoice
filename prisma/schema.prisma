@@ -1,0 +1,311 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  COMPANY_ADMIN
+  STAFF
+}
+
+enum DocumentType {
+  QUOTATION
+  INVOICE
+  RECEIPT
+}
+
+enum DocumentStatus {
+  DRAFT
+  SENT
+  CONFIRMED
+  PAID
+  CANCELLED
+}
+
+model Company {
+  id        String   @id @default(cuid())
+  name      String
+  email     String?
+  phone     String?
+  address   String?  @db.Text
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users             User[]
+  settings          CompanySettings?
+  customers         Customer[]
+  quotations        Quotation[]
+  quotationItems    QuotationItem[]
+  invoices          Invoice[]
+  invoiceItems      InvoiceItem[]
+  receipts          Receipt[]
+  payments          Payment[]
+  documentSequences DocumentNumberSequence[]
+  whatsAppSendLogs  WhatsAppSendLog[]
+
+  @@index([isActive])
+  @@index([createdAt])
+}
+
+model User {
+  id           String   @id @default(cuid())
+  companyId    String
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         UserRole @default(STAFF)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  company          Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  whatsAppSendLogs WhatsAppSendLog[]
+
+  @@index([companyId])
+  @@index([role])
+  @@index([isActive])
+  @@index([createdAt])
+}
+
+model CompanySettings {
+  id                       String   @id @default(cuid())
+  companyId                String   @unique
+  logoUrl                  String?
+  chopUrl                  String?
+  ssmNumber                String?
+  invoicePrefix            String   @default("INV-")
+  invoiceStartNumber       Int      @default(1)
+  quotationPrefix          String   @default("QUO-")
+  quotationStartNumber     Int      @default(1)
+  receiptPrefix            String   @default("REC-")
+  receiptStartNumber       Int      @default(1)
+  documentNumberPadding    Int      @default(5)
+  paymentInfo              String?  @db.Text
+  defaultImportantNotes    String?  @db.Text
+  defaultRemarks           String?  @db.Text
+  defaultInvoiceTemplate   String   @default("classic")
+  defaultQuotationTemplate String   @default("classic")
+  defaultReceiptTemplate   String   @default("classic")
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+}
+
+model DocumentNumberSequence {
+  id            String       @id @default(cuid())
+  companyId     String
+  documentType  DocumentType
+  currentNumber Int          @default(0)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, documentType])
+  @@index([companyId])
+}
+
+model Customer {
+  id        String   @id @default(cuid())
+  companyId String
+  name      String
+  email     String?
+  phone     String?
+  whatsapp  String?
+  address   String?  @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company    Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  quotations Quotation[]
+  invoices   Invoice[]
+  receipts   Receipt[]
+  payments   Payment[]
+
+  @@index([companyId, name])
+}
+
+model Quotation {
+  id                   String         @id @default(cuid())
+  companyId            String
+  customerId           String
+  quotationNumber      String
+  status               DocumentStatus @default(DRAFT)
+  issueDate            DateTime
+  validUntil           DateTime?
+  subtotal             Decimal        @default(0) @db.Decimal(12, 2)
+  total                Decimal        @default(0) @db.Decimal(12, 2)
+  importantNotes       String?        @db.Text
+  paymentInfo          String?        @db.Text
+  remarks              String?        @db.Text
+  templateKey          String         @default("classic")
+  pdfUrl               String?
+  pdfGeneratedAt       DateTime?
+  pdfNeedsRegeneration Boolean        @default(false)
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+
+  company  Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  customer Customer        @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  items    QuotationItem[]
+  invoice  Invoice?
+
+  @@unique([companyId, quotationNumber])
+  @@index([companyId, customerId])
+  @@index([companyId, status])
+  @@index([companyId, issueDate])
+  @@index([companyId, createdAt])
+}
+
+model QuotationItem {
+  id           String   @id @default(cuid())
+  companyId    String
+  quotationId  String
+  description  String   @db.Text
+  quantity     Decimal  @default(1) @db.Decimal(12, 2)
+  showQuantity Boolean  @default(true)
+  unitPrice    Decimal  @default(0) @db.Decimal(12, 2)
+  lineTotal    Decimal  @default(0) @db.Decimal(12, 2)
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  company   Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  quotation Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, quotationId])
+}
+
+model Invoice {
+  id                   String         @id @default(cuid())
+  companyId            String
+  customerId           String
+  quotationId          String?        @unique
+  invoiceNumber        String
+  status               DocumentStatus @default(DRAFT)
+  issueDate            DateTime
+  dueDate              DateTime?
+  subtotal             Decimal        @default(0) @db.Decimal(12, 2)
+  total                Decimal        @default(0) @db.Decimal(12, 2)
+  paidAmount           Decimal        @default(0) @db.Decimal(12, 2)
+  refundableDeposit    Decimal        @default(0) @db.Decimal(12, 2)
+  importantNotes       String?        @db.Text
+  paymentInfo          String?        @db.Text
+  remarks              String?        @db.Text
+  templateKey          String         @default("classic")
+  pdfUrl               String?
+  pdfGeneratedAt       DateTime?
+  pdfNeedsRegeneration Boolean        @default(false)
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+
+  company   Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  customer  Customer      @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  quotation Quotation?    @relation(fields: [quotationId], references: [id], onDelete: SetNull)
+  items     InvoiceItem[]
+  receipt   Receipt?
+  payments  Payment[]
+
+  @@unique([companyId, invoiceNumber])
+  @@index([companyId, customerId])
+  @@index([companyId, status])
+  @@index([companyId, issueDate])
+  @@index([companyId, createdAt])
+}
+
+model InvoiceItem {
+  id           String   @id @default(cuid())
+  companyId    String
+  invoiceId    String
+  description  String   @db.Text
+  quantity     Decimal  @default(1) @db.Decimal(12, 2)
+  showQuantity Boolean  @default(true)
+  unitPrice    Decimal  @default(0) @db.Decimal(12, 2)
+  lineTotal    Decimal  @default(0) @db.Decimal(12, 2)
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, invoiceId])
+}
+
+model Receipt {
+  id                   String         @id @default(cuid())
+  companyId            String
+  customerId           String
+  invoiceId            String         @unique
+  receiptNumber        String
+  status               DocumentStatus @default(PAID)
+  receiptDate          DateTime
+  amount               Decimal        @default(0) @db.Decimal(12, 2)
+  paymentMethod        String?
+  notes                String?        @db.Text
+  templateKey          String         @default("classic")
+  pdfUrl               String?
+  pdfGeneratedAt       DateTime?
+  pdfNeedsRegeneration Boolean        @default(false)
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+
+  company  Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  customer Customer  @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  invoice  Invoice   @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+  payments Payment[]
+
+  @@unique([companyId, receiptNumber])
+  @@index([companyId, customerId])
+  @@index([companyId, receiptDate])
+  @@index([companyId, status])
+  @@index([companyId, createdAt])
+}
+
+model Payment {
+  id         String   @id @default(cuid())
+  companyId  String
+  customerId String?
+  invoiceId  String?
+  receiptId  String?
+  amount     Decimal  @default(0) @db.Decimal(12, 2)
+  paidAt     DateTime
+  method     String?
+  reference  String?
+  notes      String?  @db.Text
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  company  Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  customer Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  invoice  Invoice?  @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  receipt  Receipt?  @relation(fields: [receiptId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, paidAt])
+  @@index([companyId, invoiceId])
+  @@index([companyId, receiptId])
+}
+
+model WhatsAppSendLog {
+  id           String       @id @default(cuid())
+  companyId    String
+  documentType DocumentType
+  documentId   String
+  phoneNumber  String
+  message      String       @db.Text
+  sentAt       DateTime     @default(now())
+  sentByUserId String
+
+  company    Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  sentByUser User    @relation(fields: [sentByUserId], references: [id], onDelete: Restrict)
+
+  @@index([companyId, documentType, documentId])
+  @@index([companyId, sentAt])
+}
