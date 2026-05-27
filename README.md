@@ -266,13 +266,18 @@ After uploading the repository to Hostinger and configuring environment variable
 ```bash
 corepack enable
 yarn install --immutable
-yarn prisma generate
-yarn prisma migrate deploy
-yarn build
+yarn run build
 yarn start
 ```
 
-Use `yarn prisma migrate deploy` for production databases. Do not use `yarn prisma migrate dev` in production.
+Hostinger only needs `yarn run build` as the build command. The build script now runs these steps in order:
+
+- `prisma generate`
+- `prisma migrate deploy`
+- `next build`
+- `node scripts/prepare-standalone-deploy.mjs`
+
+If `prisma migrate deploy` fails, the build fails immediately, which keeps deployment errors explicit instead of shipping a half-ready app. Do not use `yarn prisma migrate dev` in production.
 
 ### Standalone Output Contents
 
@@ -295,7 +300,15 @@ It also removes copied env files from the standalone output, so `.env` and `.env
 
 ### Running Prisma Migrations On Hostinger
 
-If you deploy from the standalone output folder, run the Prisma commands from inside that deployed app directory, the same place that contains `server.js` and `package.json`.
+If you deploy from the standalone output folder, the normal Hostinger deployment path is:
+
+```bash
+yarn run build
+```
+
+because the build script already runs Prisma generate and Prisma migrate deploy before preparing `.next/standalone`.
+
+If you ever need to run Prisma manually from the deployed standalone app directory, run the commands from inside the folder that contains `server.js` and `package.json`.
 
 Example production flow inside the deployed folder:
 
