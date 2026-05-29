@@ -272,12 +272,15 @@ yarn start
 
 Hostinger only needs `yarn run build` as the build command. The build script now runs these steps in order:
 
+- `node scripts/print-database-target.mjs`
 - `prisma generate`
 - `prisma migrate deploy`
 - `next build`
 - `node scripts/prepare-standalone-deploy.mjs`
 
-If `prisma migrate deploy` fails, the build fails immediately, which keeps deployment errors explicit instead of shipping a half-ready app. Do not use `yarn prisma migrate dev` in production.
+The database target check prints whether `DATABASE_URL` exists, where it was read from, plus the parsed host, port, database name, and username. It never prints the password. If `prisma migrate deploy` fails, the build fails immediately, which keeps deployment errors explicit instead of shipping a half-ready app. Do not use `yarn prisma migrate dev` in production.
+
+If the build log says the database host is `localhost` or `127.0.0.1`, Hostinger is reading a stale or incorrect `DATABASE_URL`. The production `DATABASE_URL` should use the Hostinger MySQL host assigned to the database, not a local database host.
 
 ### Standalone Output Contents
 
@@ -326,6 +329,7 @@ yarn start
 - Create a production MySQL database and user in Hostinger.
 - Grant only the privileges needed for this app database.
 - Use the Hostinger MySQL host, port, database name, username, and password in `DATABASE_URL`.
+- URL-encode special characters in the database password. For example, `#` becomes `%23`, `@` becomes `%40`, `%` becomes `%25`, `/` becomes `%2F`, `?` becomes `%3F`, and `&` becomes `%26`.
 - Keep regular MySQL backups before and after deployments that run migrations.
 
 ### GitHub Safety

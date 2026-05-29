@@ -8,12 +8,13 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && prisma migrate deploy && next build && node scripts/prepare-standalone-deploy.mjs",
+    "build": "node scripts/print-database-target.mjs && prisma generate && prisma migrate deploy && next build && node scripts/prepare-standalone-deploy.mjs",
     "start": "node .next/standalone/server.js",
     "typecheck": "tsc --noEmit",
     "prisma": "prisma",
     "prisma:generate": "prisma generate",
     "migrate:deploy": "prisma migrate deploy",
+    "db:target": "node scripts/print-database-target.mjs",
     "db:health": "tsx scripts/db-health.ts",
     "seed": "tsx prisma/seed.ts"
   },
