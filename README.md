@@ -92,6 +92,7 @@ NEXT_PUBLIC_APP_URL="http://localhost:3000"
 SUPER_ADMIN_EMAIL="owner@example.com"
 SUPER_ADMIN_PASSWORD="change-this-password"
 SUPER_ADMIN_NAME="System Owner"
+BOOTSTRAP_SUPER_ADMIN_TOKEN="replace-with-a-long-random-bootstrap-token"
 SEED_DEMO_DATA="true"
 ```
 
@@ -246,16 +247,46 @@ AUTH_SECRET="a-long-random-production-secret"
 NEXT_PUBLIC_APP_URL="https://your-domain.com"
 ```
 
-Optional only when manually running `yarn seed`:
+Admin bootstrap and optional seed variables:
 
 ```env
 SUPER_ADMIN_EMAIL="owner@example.com"
 SUPER_ADMIN_PASSWORD="replace-with-a-strong-password"
 SUPER_ADMIN_NAME="System Owner"
+BOOTSTRAP_SUPER_ADMIN_TOKEN="replace-with-a-long-random-bootstrap-token"
 SEED_DEMO_DATA="false"
 ```
 
-To create or update only the Super Admin in production after deployment, keep `SEED_DEMO_DATA=false` and run:
+### Production Super Admin Bootstrap
+
+Hostinger SSH may not expose `node`, `npm`, or `yarn` in the same way as the build environment. To avoid needing `prisma db seed` in production, the app provides a guarded one-time bootstrap endpoint:
+
+```text
+POST /api/bootstrap-super-admin
+```
+
+Before calling it, configure these Hostinger environment variables:
+
+```env
+SUPER_ADMIN_EMAIL="owner@example.com"
+SUPER_ADMIN_PASSWORD="replace-with-a-strong-password"
+SUPER_ADMIN_NAME="System Owner"
+BOOTSTRAP_SUPER_ADMIN_TOKEN="replace-with-a-long-random-bootstrap-token"
+SEED_DEMO_DATA="false"
+```
+
+Then call the endpoint from your local machine:
+
+```bash
+curl -X POST "https://your-domain.com/api/bootstrap-super-admin" \
+  -H "x-bootstrap-token: replace-with-a-long-random-bootstrap-token"
+```
+
+The route checks whether any `SUPER_ADMIN` already exists. If one exists, it returns success and does not create a duplicate. If none exists and the token is valid, it creates the System Administration company and the first `SUPER_ADMIN` using the `SUPER_ADMIN_*` variables.
+
+After the first successful bootstrap, remove `BOOTSTRAP_SUPER_ADMIN_TOKEN` from Hostinger or rotate it to a new unused value. The route is still protected by the token and will not create duplicates when a Super Admin already exists.
+
+If you can run Yarn normally and prefer the seed script, create or update only the Super Admin in production by keeping `SEED_DEMO_DATA=false` and running:
 
 ```bash
 SEED_DEMO_DATA=false yarn seed
