@@ -7,7 +7,7 @@ import { PostRedirectButton } from "@/components/PostRedirectButton";
 import { StatusPill } from "@/components/StatusPill";
 import { WhatsAppButton } from "@/components/WhatsAppButton";
 import { money, shortDate } from "@/lib/format";
-import { requireUser } from "@/lib/auth";
+import { requireCompanyUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 export default async function QuotationDetailPage({
@@ -17,7 +17,7 @@ export default async function QuotationDetailPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ pdf?: string }>;
 }) {
-  const user = await requireUser();
+  const user = await requireCompanyUser();
   const { id } = await params;
   const query = await searchParams;
   const quotation = await prisma.quotation.findFirst({

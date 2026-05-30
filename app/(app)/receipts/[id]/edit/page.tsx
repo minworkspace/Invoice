@@ -2,15 +2,16 @@ import { notFound, redirect } from "next/navigation";
 import { ReceiptForm } from "@/components/ReceiptForm";
 import { normalizeDocumentTemplateKey } from "@/components/document-templates/template-registry";
 import { PageHeader } from "@/components/PageHeader";
-import { requireUser } from "@/lib/auth";
+import { requireCompanyUser } from "@/lib/auth";
 import { dateInput, decimalInput } from "@/lib/format";
 import { formDate, formMoney, formStatus, formString, nullableString } from "@/lib/forms";
 import { versionedLogoUrl } from "@/lib/logo-shared";
 import { prisma } from "@/lib/prisma";
+import { ensureCompanySettings } from "@/lib/company-settings";
 
 async function updateReceiptAction(formData: FormData) {
   "use server";
-  const user = await requireUser();
+  const user = await requireCompanyUser();
   const id = formString(formData, "id");
 
   const existing = await prisma.receipt.findFirst({
@@ -43,24 +44,26 @@ export default async function EditReceiptPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ saved?: string; preview?: string }>;
 }) {
-  const user = await requireUser();
+  const user = await requireCompanyUser();
   const { id } = await params;
   const query = await searchParams;
-  const receipt = await prisma.receipt.findFirst({
-    where: { id, companyId: user.companyId },
-    include: {
-      company: { include: { settings: true } },
-      customer: true,
-      invoice: {
-        include: {
-          items: { orderBy: { sortOrder: "asc" } }
+  const [receipt, settings] = await Promise.all([
+    prisma.receipt.findFirst({
+      where: { id, companyId: user.companyId },
+      include: {
+        company: true,
+        customer: true,
+        invoice: {
+          include: {
+            items: { orderBy: { sortOrder: "asc" } }
+          }
         }
       }
-    }
-  });
+    }),
+    ensureCompanySettings(user.companyId)
+  ]);
 
   if (!receipt) notFound();
-  const settings = receipt.company.settings;
 
   return (
     <>

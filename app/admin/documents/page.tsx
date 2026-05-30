@@ -1,17 +1,20 @@
 import Link from "next/link";
-import { DocumentStatus, Prisma } from "@prisma/client";
+import fs from "fs";
+import { DocumentStatus, DocumentType, Prisma } from "@prisma/client";
 import { AdminPager } from "@/components/AdminPager";
 import { StatusPill } from "@/components/StatusPill";
 import { pageCount, pageNumber, pagination } from "@/lib/admin-utils";
 import { requireSuperAdmin } from "@/lib/auth";
 import { money, shortDate } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
+import { getLocalFilePath } from "@/lib/storage";
 
 type DocumentKind = "invoice" | "quotation" | "receipt";
 
 type AdminDocumentRow = {
   id: string;
   type: "Invoice" | "Quotation" | "Receipt";
+  documentType: DocumentType;
   number: string;
   companyId: string;
   companyName: string;
@@ -20,11 +23,18 @@ type AdminDocumentRow = {
   amount: Prisma.Decimal;
   status: DocumentStatus;
   pdfUrl: string | null;
+  pdfAvailable: boolean;
 };
 
 function documentKind(value?: string): DocumentKind {
   if (value === "quotation" || value === "receipt") return value;
   return "invoice";
+}
+
+function pdfAvailable(pdfUrl?: string | null) {
+  if (!pdfUrl) return false;
+  const filePath = getLocalFilePath(pdfUrl);
+  return Boolean(filePath && fs.existsSync(filePath));
 }
 
 export default async function AdminDocumentsPage({
@@ -84,6 +94,7 @@ export default async function AdminDocumentsPage({
     rows = docs.map((doc) => ({
       id: doc.id,
       type: "Invoice",
+      documentType: DocumentType.INVOICE,
       number: doc.invoiceNumber,
       companyId: doc.company.id,
       companyName: doc.company.name,
@@ -91,7 +102,8 @@ export default async function AdminDocumentsPage({
       date: doc.issueDate,
       amount: doc.total,
       status: doc.status,
-      pdfUrl: doc.pdfUrl
+      pdfUrl: doc.pdfUrl,
+      pdfAvailable: pdfAvailable(doc.pdfUrl)
     }));
   } else if (type === "quotation") {
     const where: Prisma.QuotationWhereInput = {
@@ -128,6 +140,7 @@ export default async function AdminDocumentsPage({
     rows = docs.map((doc) => ({
       id: doc.id,
       type: "Quotation",
+      documentType: DocumentType.QUOTATION,
       number: doc.quotationNumber,
       companyId: doc.company.id,
       companyName: doc.company.name,
@@ -135,7 +148,8 @@ export default async function AdminDocumentsPage({
       date: doc.issueDate,
       amount: doc.total,
       status: doc.status,
-      pdfUrl: doc.pdfUrl
+      pdfUrl: doc.pdfUrl,
+      pdfAvailable: pdfAvailable(doc.pdfUrl)
     }));
   } else {
     const where: Prisma.ReceiptWhereInput = {
@@ -173,6 +187,7 @@ export default async function AdminDocumentsPage({
     rows = docs.map((doc) => ({
       id: doc.id,
       type: "Receipt",
+      documentType: DocumentType.RECEIPT,
       number: doc.receiptNumber,
       companyId: doc.company.id,
       companyName: doc.company.name,
@@ -180,7 +195,8 @@ export default async function AdminDocumentsPage({
       date: doc.receiptDate,
       amount: doc.amount,
       status: doc.status,
-      pdfUrl: doc.pdfUrl
+      pdfUrl: doc.pdfUrl,
+      pdfAvailable: pdfAvailable(doc.pdfUrl)
     }));
   }
 
@@ -265,12 +281,14 @@ export default async function AdminDocumentsPage({
                   <StatusPill status={row.status} />
                 </td>
                 <td className="table-cell">
-                  {row.pdfUrl ? (
-                    <a className="font-semibold text-brand" href={`/api/documents/${row.type.toUpperCase()}/${row.id}/pdf`}>
+                  {row.pdfAvailable ? (
+                    <a className="font-semibold text-brand" href={`/api/documents/${row.documentType}/${row.id}/pdf?inline=1`} target="_blank" rel="noreferrer">
                       View PDF
                     </a>
+                  ) : row.pdfUrl ? (
+                    <span className="text-muted">PDF file missing</span>
                   ) : (
-                    <span className="text-muted">-</span>
+                    <span className="text-muted">Not generated</span>
                   )}
                 </td>
               </tr>

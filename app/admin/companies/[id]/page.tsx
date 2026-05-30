@@ -1,16 +1,24 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { AdminDeleteButton } from "@/components/AdminDeleteButton";
 import { getDocumentTemplate } from "@/components/document-templates/template-registry";
 import { StatusPill } from "@/components/StatusPill";
 import { pdfStorageSummary } from "@/lib/admin-utils";
 import { requireSuperAdmin } from "@/lib/auth";
 import { money, shortDate } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
-import { setCompanyActiveAction, setUserActiveAction } from "../../actions";
+import { deleteCompanyAction, deleteUserAction, setCompanyActiveAction, setUserActiveAction } from "../../actions";
 
-export default async function AdminCompanyDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  await requireSuperAdmin();
+export default async function AdminCompanyDetailPage({
+  params,
+  searchParams
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ created?: string }>;
+}) {
+  const admin = await requireSuperAdmin();
   const { id } = await params;
+  const query = await searchParams;
 
   const [company, users, invoices, quotations, receipts, storage] = await Promise.all([
     prisma.company.findUnique({
@@ -126,15 +134,39 @@ export default async function AdminCompanyDetailPage({ params }: { params: Promi
           <Link className="btn btn-secondary" href={`/admin/documents?companyId=${company.id}`}>
             Documents
           </Link>
-          <form action={setCompanyActiveAction}>
-            <input name="companyId" type="hidden" value={company.id} />
-            <input name="isActive" type="hidden" value={company.isActive ? "false" : "true"} />
-            <button className="btn btn-primary" type="submit">
-              {company.isActive ? "Disable company" : "Enable company"}
-            </button>
-          </form>
+          {company.id === admin.companyId ? (
+            <span className="self-center rounded-full border border-line px-3 py-2 text-sm font-semibold text-muted">
+              Protected system company
+            </span>
+          ) : (
+            <>
+              <form action={setCompanyActiveAction}>
+                <input name="companyId" type="hidden" value={company.id} />
+                <input name="isActive" type="hidden" value={company.isActive ? "false" : "true"} />
+                <button className="btn btn-primary" type="submit">
+                  {company.isActive ? "Disable company" : "Enable company"}
+                </button>
+              </form>
+              <AdminDeleteButton
+                action={deleteCompanyAction}
+                buttonClassName="btn btn-danger"
+                buttonLabel="Delete company"
+                confirmLabel="Delete company"
+                confirmText={company.name}
+                description="This permanently deletes the company, users, customers, documents, payments, WhatsApp logs, numbering sequences, settings, uploaded logos/chops, and generated PDFs. Use this only for test/demo tenants."
+                fields={{ companyId: company.id }}
+                title={`Delete ${company.name}?`}
+              />
+            </>
+          )}
         </div>
       </header>
+
+      {query.created ? (
+        <div className="rounded-md border border-[#BBD7C1] bg-[#F0FAF2] px-3 py-2 text-sm text-[#2D6338]">
+          Company account created. The Company Admin can now log in and issue documents.
+        </div>
+      ) : null}
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         <StatCard label="Users" value={company._count.users} />
@@ -192,13 +224,27 @@ export default async function AdminCompanyDetailPage({ params }: { params: Promi
                     <td className="table-cell">{user.isActive ? "Active" : "Disabled"}</td>
                     <td className="table-cell">{shortDate(user.createdAt)}</td>
                     <td className="table-cell text-right">
-                      <form action={setUserActiveAction}>
-                        <input name="userId" type="hidden" value={user.id} />
-                        <input name="isActive" type="hidden" value={user.isActive ? "false" : "true"} />
-                        <button className="btn btn-secondary h-9" type="submit">
-                          {user.isActive ? "Disable" : "Enable"}
-                        </button>
-                      </form>
+                      {user.id === admin.id ? (
+                        <span className="text-sm text-muted">Current user</span>
+                      ) : (
+                        <div className="flex justify-end gap-2">
+                          <form action={setUserActiveAction}>
+                            <input name="userId" type="hidden" value={user.id} />
+                            <input name="isActive" type="hidden" value={user.isActive ? "false" : "true"} />
+                            <button className="btn btn-secondary h-9" type="submit">
+                              {user.isActive ? "Disable" : "Enable"}
+                            </button>
+                          </form>
+                          <AdminDeleteButton
+                            action={deleteUserAction}
+                            buttonLabel="Delete"
+                            confirmLabel="Delete user"
+                            description="This permanently deletes the user account and WhatsApp send logs created by this user. Company documents are kept."
+                            fields={{ userId: user.id }}
+                            title={`Delete ${user.name}?`}
+                          />
+                        </div>
+                      )}
                     </td>
                   </tr>
                 ))}

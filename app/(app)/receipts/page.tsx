@@ -4,7 +4,7 @@ import { AdminPager } from "@/components/AdminPager";
 import { PageHeader } from "@/components/PageHeader";
 import { StatusPill } from "@/components/StatusPill";
 import { money, shortDate } from "@/lib/format";
-import { requireUser } from "@/lib/auth";
+import { requireCompanyUser } from "@/lib/auth";
 import { pageCount, pageNumber, pagination } from "@/lib/admin-utils";
 import { prisma } from "@/lib/prisma";
 
@@ -13,7 +13,7 @@ export default async function ReceiptsPage({
 }: {
   searchParams: Promise<{ q?: string; customerId?: string; status?: string; from?: string; to?: string; page?: string }>;
 }) {
-  const user = await requireUser();
+  const user = await requireCompanyUser();
   const params = await searchParams;
   const q = params?.q?.trim();
   const page = pageNumber(params.page);

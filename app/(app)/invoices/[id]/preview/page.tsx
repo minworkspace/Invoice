@@ -2,11 +2,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { FinalPdfPreviewFrame } from "@/components/FinalPdfPreviewFrame";
 import { PageHeader } from "@/components/PageHeader";
-import { requireUser } from "@/lib/auth";
+import { requireCompanyUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 export default async function InvoicePreviewPage({ params }: { params: Promise<{ id: string }> }) {
-  const user = await requireUser();
+  const user = await requireCompanyUser();
   const { id } = await params;
   const invoice = await prisma.invoice.findFirst({
     where: { id, companyId: user.companyId },

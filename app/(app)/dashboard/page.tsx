@@ -4,11 +4,11 @@ import { DeleteDocumentButton } from "@/components/DeleteDocumentButton";
 import { PageHeader } from "@/components/PageHeader";
 import { StatusPill } from "@/components/StatusPill";
 import { money, shortDate } from "@/lib/format";
-import { requireUser } from "@/lib/auth";
+import { requireCompanyUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 export default async function DashboardPage() {
-  const user = await requireUser();
+  const user = await requireCompanyUser();
   const startOfMonth = new Date();
   startOfMonth.setDate(1);
   startOfMonth.setHours(0, 0, 0, 0);

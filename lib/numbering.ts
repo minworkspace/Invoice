@@ -1,6 +1,7 @@
 import "server-only";
 
 import { DocumentType, Prisma } from "@prisma/client";
+import { ensureCompanySettings, ensureCompanySettingsTx } from "@/lib/company-settings";
 import { prisma } from "@/lib/prisma";
 
 type NumberSettings = {
@@ -104,9 +105,7 @@ async function nextUnusedDocumentNumber(
 }
 
 export async function getSuggestedDocumentNumber(companyId: string, documentType: DocumentType) {
-  const settings = await prisma.companySettings.findUniqueOrThrow({
-    where: { companyId }
-  });
+  const settings = await ensureCompanySettings(companyId);
   const sequence = await prisma.documentNumberSequence.findUnique({
     where: {
       companyId_documentType: {
@@ -126,9 +125,7 @@ export async function reserveDocumentNumberTx(
   companyId: string,
   documentType: DocumentType
 ) {
-  const settings = await tx.companySettings.findUniqueOrThrow({
-    where: { companyId }
-  });
+  const settings = await ensureCompanySettingsTx(tx, companyId);
   const config = settingsForType(settings, documentType);
 
   let sequence = await tx.documentNumberSequence.upsert({
@@ -180,9 +177,7 @@ export async function releaseDocumentNumberIfLatestDraftTx(
 ) {
   if (status !== "DRAFT") return;
 
-  const settings = await tx.companySettings.findUniqueOrThrow({
-    where: { companyId }
-  });
+  const settings = await ensureCompanySettingsTx(tx, companyId);
   const config = settingsForType(settings, documentType);
   const deletedValue = parseDocumentNumberValue(documentNumber);
 

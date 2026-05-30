@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { DocumentForm } from "@/components/DocumentForm";
 import { normalizeDocumentTemplateKey } from "@/components/document-templates/template-registry";
 import { PageHeader } from "@/components/PageHeader";
-import { requireUser } from "@/lib/auth";
+import { requireCompanyUser } from "@/lib/auth";
 import { dateInput } from "@/lib/format";
 import {
   formDate,
@@ -17,6 +17,7 @@ import {
 import { getSuggestedDocumentNumber, reserveDocumentNumberTx } from "@/lib/numbering";
 import { versionedLogoUrl } from "@/lib/logo-shared";
 import { prisma } from "@/lib/prisma";
+import { ensureCompanySettings } from "@/lib/company-settings";
 
 function isUniqueConstraintError(error: unknown) {
   return Boolean(
@@ -29,7 +30,7 @@ function isUniqueConstraintError(error: unknown) {
 
 async function createInvoiceAction(formData: FormData) {
   "use server";
-  const user = await requireUser();
+  const user = await requireCompanyUser();
   const { items, subtotal, total } = parseLineItems(formData);
   let createdInvoiceId = "";
 
@@ -93,13 +94,13 @@ async function createInvoiceAction(formData: FormData) {
 }
 
 export default async function NewInvoicePage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
-  const user = await requireUser();
+  const user = await requireCompanyUser();
   const query = await searchParams;
-  const [customers, suggestedNumber] = await Promise.all([
+  const [customers, suggestedNumber, settings] = await Promise.all([
     prisma.customer.findMany({ where: { companyId: user.companyId }, orderBy: { name: "asc" } }),
-    getSuggestedDocumentNumber(user.companyId, DocumentType.INVOICE)
+    getSuggestedDocumentNumber(user.companyId, DocumentType.INVOICE),
+    ensureCompanySettings(user.companyId)
   ]);
-  const settings = user.company.settings;
 
   return (
     <>

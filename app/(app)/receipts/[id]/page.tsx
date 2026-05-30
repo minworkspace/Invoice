@@ -7,7 +7,7 @@ import { SuccessModal } from "@/components/SuccessModal";
 import { StatusPill } from "@/components/StatusPill";
 import { WhatsAppButton } from "@/components/WhatsAppButton";
 import { money, shortDate } from "@/lib/format";
-import { requireUser } from "@/lib/auth";
+import { requireCompanyUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 export default async function ReceiptDetailPage({
@@ -17,7 +17,7 @@ export default async function ReceiptDetailPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ pdf?: string; created?: string }>;
 }) {
-  const user = await requireUser();
+  const user = await requireCompanyUser();
   const { id } = await params;
   const query = await searchParams;
   const receipt = await prisma.receipt.findFirst({

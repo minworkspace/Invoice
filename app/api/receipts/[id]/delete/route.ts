@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireUser } from "@/lib/auth";
+import { requireCompanyUser } from "@/lib/auth";
 import { deleteReceiptDocument } from "@/lib/document-delete";
 
 function safeReturnTo(value: string | null, fallback: string) {
@@ -7,7 +7,7 @@ function safeReturnTo(value: string | null, fallback: string) {
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const user = await requireUser();
+  const user = await requireCompanyUser();
   const { id } = await params;
   const returnTo = safeReturnTo(new URL(request.url).searchParams.get("returnTo"), "/receipts");
 

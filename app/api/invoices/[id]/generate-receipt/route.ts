@@ -1,12 +1,13 @@
 import { DocumentType } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { normalizeDocumentTemplateKey } from "@/components/document-templates/template-registry";
-import { requireUser } from "@/lib/auth";
+import { requireCompanyUser } from "@/lib/auth";
+import { ensureCompanySettingsTx } from "@/lib/company-settings";
 import { reserveDocumentNumberTx } from "@/lib/numbering";
 import { prisma } from "@/lib/prisma";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const user = await requireUser();
+  const user = await requireCompanyUser();
   const { id } = await params;
 
   const receipt = await prisma.$transaction(async (tx) => {
@@ -20,10 +21,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
     const receiptNumber = await reserveDocumentNumberTx(tx, user.companyId, DocumentType.RECEIPT);
     const amount = invoice.paidAmount.toString() === "0" ? invoice.total : invoice.paidAmount;
-    const settings = await tx.companySettings.findUnique({
-      where: { companyId: user.companyId },
-      select: { defaultReceiptTemplate: true }
-    });
+    const settings = await ensureCompanySettingsTx(tx, user.companyId);
 
     const newReceipt = await tx.receipt.create({
       data: {
@@ -36,7 +34,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         amount,
         paymentMethod: "Manual",
         notes: `Receipt generated from invoice ${invoice.invoiceNumber}.`,
-        templateKey: normalizeDocumentTemplateKey(settings?.defaultReceiptTemplate),
+        templateKey: normalizeDocumentTemplateKey(settings.defaultReceiptTemplate),
         payments: {
           create: {
             companyId: user.companyId,

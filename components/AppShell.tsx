@@ -18,6 +18,13 @@ const links = [
   ["Settings", "/settings"]
 ];
 
+const superAdminLinks = [
+  ["Admin", "/admin"],
+  ["Companies", "/admin/companies"],
+  ["Users", "/admin/users"],
+  ["Documents", "/admin/documents"]
+];
+
 async function logoutAction() {
   "use server";
   await clearSession();
@@ -25,7 +32,7 @@ async function logoutAction() {
 }
 
 export function AppShell({ companyName, role, userName, children }: AppShellProps) {
-  const visibleLinks = role === "SUPER_ADMIN" ? [...links, ["Admin", "/admin"]] : links;
+  const visibleLinks = role === "SUPER_ADMIN" ? superAdminLinks : links;
 
   return (
     <div className="min-h-screen bg-paper">

@@ -3,16 +3,17 @@ import { redirect } from "next/navigation";
 import { DocumentForm } from "@/components/DocumentForm";
 import { normalizeDocumentTemplateKey } from "@/components/document-templates/template-registry";
 import { PageHeader } from "@/components/PageHeader";
-import { requireUser } from "@/lib/auth";
+import { requireCompanyUser } from "@/lib/auth";
 import { formDate, formStatus, formString, nullableDate, nullableString, parseLineItems } from "@/lib/forms";
 import { dateInput } from "@/lib/format";
 import { getSuggestedDocumentNumber, reserveDocumentNumberTx } from "@/lib/numbering";
 import { versionedLogoUrl } from "@/lib/logo-shared";
 import { prisma } from "@/lib/prisma";
+import { ensureCompanySettings } from "@/lib/company-settings";
 
 async function createQuotationAction(formData: FormData) {
   "use server";
-  const user = await requireUser();
+  const user = await requireCompanyUser();
   const { items, subtotal, total } = parseLineItems(formData);
 
   const quotation = await prisma.$transaction(async (tx) => {
@@ -51,12 +52,12 @@ async function createQuotationAction(formData: FormData) {
 }
 
 export default async function NewQuotationPage() {
-  const user = await requireUser();
-  const [customers, suggestedNumber] = await Promise.all([
+  const user = await requireCompanyUser();
+  const [customers, suggestedNumber, settings] = await Promise.all([
     prisma.customer.findMany({ where: { companyId: user.companyId }, orderBy: { name: "asc" } }),
-    getSuggestedDocumentNumber(user.companyId, DocumentType.QUOTATION)
+    getSuggestedDocumentNumber(user.companyId, DocumentType.QUOTATION),
+    ensureCompanySettings(user.companyId)
   ]);
-  const settings = user.company.settings;
 
   return (
     <>

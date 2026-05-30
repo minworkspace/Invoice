@@ -2,7 +2,8 @@ import { redirect } from "next/navigation";
 import { documentTemplateOptions, normalizeDocumentTemplateKey } from "@/components/document-templates/template-registry";
 import { CompanyImageField } from "@/components/CompanyImageField";
 import { PageHeader } from "@/components/PageHeader";
-import { requireUser } from "@/lib/auth";
+import { requireCompanyUser } from "@/lib/auth";
+import { ensureCompanySettings } from "@/lib/company-settings";
 import { formString, nullableString } from "@/lib/forms";
 import { deleteManagedChopFile, deleteManagedLogoFile, saveCompanyChop, saveCompanyLogo } from "@/lib/logo";
 import { versionedLogoUrl } from "@/lib/logo-shared";
@@ -10,7 +11,7 @@ import { prisma } from "@/lib/prisma";
 
 async function updateSettingsAction(formData: FormData) {
   "use server";
-  const user = await requireUser();
+  const user = await requireCompanyUser();
   const nextCompanyName = formString(formData, "companyName");
   const nextCompanyEmail = nullableString(formData, "companyEmail");
   const nextCompanyPhone = nullableString(formData, "companyPhone");
@@ -150,9 +151,9 @@ export default async function SettingsPage({
 }: {
   searchParams: Promise<{ saved?: string; error?: string }>;
 }) {
-  const user = await requireUser();
+  const user = await requireCompanyUser();
   const params = await searchParams;
-  const settings = user.company.settings;
+  const settings = await ensureCompanySettings(user.companyId);
 
   return (
     <>

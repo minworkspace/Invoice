@@ -2,15 +2,16 @@ import { notFound, redirect } from "next/navigation";
 import { DocumentForm } from "@/components/DocumentForm";
 import { normalizeDocumentTemplateKey } from "@/components/document-templates/template-registry";
 import { PageHeader } from "@/components/PageHeader";
-import { requireUser } from "@/lib/auth";
+import { requireCompanyUser } from "@/lib/auth";
 import { dateInput, decimalInput } from "@/lib/format";
 import { versionedLogoUrl } from "@/lib/logo-shared";
 import { formDate, formStatus, formString, nullableDate, nullableString, parseLineItems } from "@/lib/forms";
 import { prisma } from "@/lib/prisma";
+import { ensureCompanySettings } from "@/lib/company-settings";
 
 async function updateQuotationAction(formData: FormData) {
   "use server";
-  const user = await requireUser();
+  const user = await requireCompanyUser();
   const id = formString(formData, "id");
   const { items, subtotal, total } = parseLineItems(formData);
 
@@ -61,19 +62,19 @@ export default async function EditQuotationPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ created?: string; saved?: string; preview?: string }>;
 }) {
-  const user = await requireUser();
+  const user = await requireCompanyUser();
   const { id } = await params;
   const query = await searchParams;
-  const [quotation, customers] = await Promise.all([
+  const [quotation, customers, settings] = await Promise.all([
     prisma.quotation.findFirst({
       where: { id, companyId: user.companyId },
       include: { items: { orderBy: { sortOrder: "asc" } } }
     }),
-    prisma.customer.findMany({ where: { companyId: user.companyId }, orderBy: { name: "asc" } })
+    prisma.customer.findMany({ where: { companyId: user.companyId }, orderBy: { name: "asc" } }),
+    ensureCompanySettings(user.companyId)
   ]);
 
   if (!quotation) notFound();
-  const settings = user.company.settings;
 
   return (
     <>

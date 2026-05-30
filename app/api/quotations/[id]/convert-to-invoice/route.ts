@@ -1,12 +1,13 @@
 import { DocumentType } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { normalizeDocumentTemplateKey } from "@/components/document-templates/template-registry";
-import { requireUser } from "@/lib/auth";
+import { requireCompanyUser } from "@/lib/auth";
+import { ensureCompanySettingsTx } from "@/lib/company-settings";
 import { reserveDocumentNumberTx } from "@/lib/numbering";
 import { prisma } from "@/lib/prisma";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const user = await requireUser();
+  const user = await requireCompanyUser();
   const { id } = await params;
 
   const invoice = await prisma.$transaction(async (tx) => {
@@ -22,10 +23,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (quotation.invoice) return quotation.invoice;
 
     const invoiceNumber = await reserveDocumentNumberTx(tx, user.companyId, DocumentType.INVOICE);
-    const settings = await tx.companySettings.findUnique({
-      where: { companyId: user.companyId },
-      select: { defaultInvoiceTemplate: true }
-    });
+    const settings = await ensureCompanySettingsTx(tx, user.companyId);
 
     return tx.invoice.create({
       data: {
@@ -40,7 +38,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         importantNotes: quotation.importantNotes,
         paymentInfo: quotation.paymentInfo,
         remarks: quotation.remarks,
-        templateKey: normalizeDocumentTemplateKey(settings?.defaultInvoiceTemplate),
+        templateKey: normalizeDocumentTemplateKey(settings.defaultInvoiceTemplate),
         items: {
           create: quotation.items.map((item) => ({
             companyId: user.companyId,

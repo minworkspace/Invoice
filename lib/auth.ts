@@ -108,6 +108,14 @@ export async function requireSuperAdmin() {
   return user;
 }
 
+export async function requireCompanyUser() {
+  const user = await requireUser();
+  if (user.role === UserRole.SUPER_ADMIN) {
+    redirect("/admin/companies?notice=super-admin-documents");
+  }
+  return user;
+}
+
 export async function requireGuest() {
   const user = await getCurrentUser();
   if (user) redirect(user.role === UserRole.SUPER_ADMIN ? "/admin" : "/dashboard");

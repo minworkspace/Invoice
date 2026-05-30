@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { Prisma } from "@prisma/client";
 import { AdminPager } from "@/components/AdminPager";
+import { AdminDeleteButton } from "@/components/AdminDeleteButton";
 import { pageCount, pageNumber, pagination } from "@/lib/admin-utils";
 import { requireSuperAdmin } from "@/lib/auth";
 import { shortDate } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
-import { setUserActiveAction } from "../actions";
+import { deleteUserAction, setUserActiveAction } from "../actions";
 
 export default async function AdminUsersPage({
   searchParams
@@ -117,13 +118,23 @@ export default async function AdminUsersPage({
                   {user.id === admin.id ? (
                     <span className="text-sm text-muted">Current user</span>
                   ) : (
-                    <form action={setUserActiveAction}>
-                      <input name="userId" type="hidden" value={user.id} />
-                      <input name="isActive" type="hidden" value={user.isActive ? "false" : "true"} />
-                      <button className="btn btn-secondary h-9" type="submit">
-                        {user.isActive ? "Disable" : "Enable"}
-                      </button>
-                    </form>
+                    <div className="flex justify-end gap-2">
+                      <form action={setUserActiveAction}>
+                        <input name="userId" type="hidden" value={user.id} />
+                        <input name="isActive" type="hidden" value={user.isActive ? "false" : "true"} />
+                        <button className="btn btn-secondary h-9" type="submit">
+                          {user.isActive ? "Disable" : "Enable"}
+                        </button>
+                      </form>
+                      <AdminDeleteButton
+                        action={deleteUserAction}
+                        buttonLabel="Delete"
+                        confirmLabel="Delete user"
+                        description="This permanently deletes the user account and WhatsApp send logs created by this user. Company documents are kept."
+                        fields={{ userId: user.id }}
+                        title={`Delete ${user.name}?`}
+                      />
+                    </div>
                   )}
                 </td>
               </tr>

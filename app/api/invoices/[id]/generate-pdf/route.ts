@@ -1,12 +1,12 @@
 import { DocumentType } from "@prisma/client";
 import { NextResponse } from "next/server";
-import { requireUser } from "@/lib/auth";
+import { requireCompanyUser } from "@/lib/auth";
 import { generateDocumentPdf } from "@/lib/pdf";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const user = await requireUser();
+  const user = await requireCompanyUser();
   const { id } = await params;
 
   try {

@@ -1,10 +1,10 @@
 import { DocumentType } from "@prisma/client";
 import { NextResponse } from "next/server";
-import { requireUser } from "@/lib/auth";
+import { requireCompanyUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 export async function POST(request: Request) {
-  const user = await requireUser();
+  const user = await requireCompanyUser();
   const body = await request.json();
   const documentType = body.documentType as DocumentType;
   const documentId = String(body.documentId || "");
