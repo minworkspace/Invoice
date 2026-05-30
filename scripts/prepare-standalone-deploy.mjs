@@ -79,6 +79,19 @@ async function copyPrismaCliPackages() {
   await copyDirectory(path.join(sourceNodeModulesDir, "@prisma"), path.join(standaloneNodeModulesDir, "@prisma"));
 }
 
+async function copyPdfKitFontData() {
+  const sourceDir = path.join(sourceNodeModulesDir, "pdfkit", "js", "data");
+  const targetDirs = [
+    path.join(standaloneNodeModulesDir, "pdfkit", "js", "data"),
+    path.join(standaloneNextDir, "server", "vendor-chunks", "data"),
+    path.join(standaloneNextDir, "server", "chunks", "data")
+  ];
+
+  for (const targetDir of targetDirs) {
+    await copyDirectory(sourceDir, targetDir);
+  }
+}
+
 async function removeEnvFiles() {
   const envFiles = [".env", ".env.local", ".env.development", ".env.production", ".env.example"];
 
@@ -95,6 +108,7 @@ async function main() {
   await copyDirectory(path.join(nextDir, "static"), path.join(standaloneNextDir, "static"));
   await copyPrismaArtifacts();
   await copyPrismaCliPackages();
+  await copyPdfKitFontData();
   await resetPublicRuntimeFolders();
   await removeEnvFiles();
   await ensureDir(path.join(standaloneDir, "tmp"));

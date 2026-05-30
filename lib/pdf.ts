@@ -153,14 +153,13 @@ async function withAsyncPdfStage<T>(stage: string, details: PdfLogContext, actio
 function ensurePdfKitStandardFontData() {
   if (pdfKitFontsReady) return;
 
-  const candidateSourceDirs = [
-    path.join(process.cwd(), "node_modules", "pdfkit", "js", "data"),
-    path.join(path.dirname(require.resolve("pdfkit")), "..", "data")
-  ];
-  const candidateDirs = [
+  const candidateSourceDirs = pdfKitFontDataSourceDirs();
+  const candidateDirs = uniqueStrings([
     path.join(process.cwd(), ".next", "server", "vendor-chunks", "data"),
-    path.join(process.cwd(), ".next", "server", "chunks", "data")
-  ];
+    path.join(process.cwd(), ".next", "server", "chunks", "data"),
+    path.join(process.cwd(), ".next", "standalone", ".next", "server", "vendor-chunks", "data"),
+    path.join(process.cwd(), ".next", "standalone", ".next", "server", "chunks", "data")
+  ]);
   const sourceDir = candidateSourceDirs.find((dir) => fs.existsSync(dir));
 
   if (!sourceDir) {
@@ -182,6 +181,33 @@ function ensurePdfKitStandardFontData() {
   }
 
   pdfKitFontsReady = true;
+}
+
+function uniqueStrings(values: string[]) {
+  return Array.from(new Set(values));
+}
+
+function tryResolvePdfKitEntryPath() {
+  try {
+    const resolved = require.resolve("pdfkit") as unknown;
+    return typeof resolved === "string" ? resolved : null;
+  } catch {
+    return null;
+  }
+}
+
+function pdfKitFontDataSourceDirs() {
+  const resolvedEntryPath = tryResolvePdfKitEntryPath();
+  return uniqueStrings([
+    path.join(process.cwd(), "node_modules", "pdfkit", "js", "data"),
+    path.join(process.cwd(), ".next", "server", "vendor-chunks", "data"),
+    path.join(process.cwd(), ".next", "server", "chunks", "data"),
+    path.join(process.cwd(), ".next", "standalone", "node_modules", "pdfkit", "js", "data"),
+    path.join(process.cwd(), ".next", "standalone", ".next", "server", "vendor-chunks", "data"),
+    path.join(process.cwd(), ".next", "standalone", ".next", "server", "chunks", "data"),
+    path.join(process.cwd(), "..", "node_modules", "pdfkit", "js", "data"),
+    resolvedEntryPath ? path.join(path.dirname(resolvedEntryPath), "data") : ""
+  ].filter(Boolean));
 }
 
 function documentPdfKey(companyId: string, documentType: "invoice" | "quotation" | "receipt", documentId: string) {
