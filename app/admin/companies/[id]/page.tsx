@@ -1,13 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AdminDeleteButton } from "@/components/AdminDeleteButton";
+import { AdminResetPasswordButton } from "@/components/AdminResetPasswordButton";
 import { getDocumentTemplate } from "@/components/document-templates/template-registry";
 import { StatusPill } from "@/components/StatusPill";
 import { pdfStorageSummary } from "@/lib/admin-utils";
 import { requireSuperAdmin } from "@/lib/auth";
 import { money, shortDate } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
-import { deleteCompanyAction, deleteUserAction, setCompanyActiveAction, setUserActiveAction } from "../../actions";
+import { deleteCompanyAction, deleteUserAction, resetUserPasswordAction, setCompanyActiveAction, setUserActiveAction } from "../../actions";
 
 export default async function AdminCompanyDetailPage({
   params,
@@ -224,27 +225,34 @@ export default async function AdminCompanyDetailPage({
                     <td className="table-cell">{user.isActive ? "Active" : "Disabled"}</td>
                     <td className="table-cell">{shortDate(user.createdAt)}</td>
                     <td className="table-cell text-right">
-                      {user.id === admin.id ? (
-                        <span className="text-sm text-muted">Current user</span>
-                      ) : (
-                        <div className="flex justify-end gap-2">
-                          <form action={setUserActiveAction}>
-                            <input name="userId" type="hidden" value={user.id} />
-                            <input name="isActive" type="hidden" value={user.isActive ? "false" : "true"} />
-                            <button className="btn btn-secondary h-9" type="submit">
-                              {user.isActive ? "Disable" : "Enable"}
-                            </button>
-                          </form>
-                          <AdminDeleteButton
-                            action={deleteUserAction}
-                            buttonLabel="Delete"
-                            confirmLabel="Delete user"
-                            description="This permanently deletes the user account and WhatsApp send logs created by this user. Company documents are kept."
-                            fields={{ userId: user.id }}
-                            title={`Delete ${user.name}?`}
-                          />
-                        </div>
-                      )}
+                      <div className="flex justify-end gap-2">
+                        <AdminResetPasswordButton
+                          action={resetUserPasswordAction}
+                          fields={{ userId: user.id }}
+                          userName={user.name}
+                        />
+                        {user.id === admin.id ? (
+                          <span className="self-center text-sm text-muted">Current user</span>
+                        ) : (
+                          <>
+                            <form action={setUserActiveAction}>
+                              <input name="userId" type="hidden" value={user.id} />
+                              <input name="isActive" type="hidden" value={user.isActive ? "false" : "true"} />
+                              <button className="btn btn-secondary h-9" type="submit">
+                                {user.isActive ? "Disable" : "Enable"}
+                              </button>
+                            </form>
+                            <AdminDeleteButton
+                              action={deleteUserAction}
+                              buttonLabel="Delete"
+                              confirmLabel="Delete user"
+                              description="This permanently deletes the user account and WhatsApp send logs created by this user. Company documents are kept."
+                              fields={{ userId: user.id }}
+                              title={`Delete ${user.name}?`}
+                            />
+                          </>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}

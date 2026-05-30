@@ -75,7 +75,6 @@ export default async function QuotationDetailPage({
                 action={`/api/quotations/${quotation.id}/convert-to-invoice`}
                 className="btn btn-primary"
                 idleLabel="Convert to invoice"
-                pendingLabel="Creating invoice..."
               />
             )}
             <DeleteDocumentButton

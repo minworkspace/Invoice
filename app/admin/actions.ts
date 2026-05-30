@@ -104,6 +104,26 @@ export async function setUserActiveAction(formData: FormData) {
   revalidatePath("/admin/companies");
 }
 
+export async function resetUserPasswordAction(formData: FormData) {
+  await requireSuperAdmin();
+  const userId = formString(formData, "userId");
+  const password = formString(formData, "password");
+  const confirmPassword = formString(formData, "confirmPassword");
+
+  if (!userId || password.length < 8 || password !== confirmPassword) return;
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      passwordHash: await hashPassword(password)
+    }
+  });
+
+  revalidatePath("/admin");
+  revalidatePath("/admin/users");
+  revalidatePath("/admin/companies");
+}
+
 export async function deleteUserAction(formData: FormData) {
   const admin = await requireSuperAdmin();
   const userId = formString(formData, "userId");

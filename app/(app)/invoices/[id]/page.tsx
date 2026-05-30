@@ -75,7 +75,6 @@ export default async function InvoiceDetailPage({
                 action={`/api/invoices/${invoice.id}/generate-receipt`}
                 className="btn btn-primary"
                 idleLabel="Generate receipt"
-                pendingLabel="Creating receipt..."
               />
             )}
             <DeleteDocumentButton

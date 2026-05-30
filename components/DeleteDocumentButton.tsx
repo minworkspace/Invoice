@@ -25,29 +25,7 @@ export function DeleteDocumentButton({
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState(false);
   const pathname = usePathname();
-
-  async function confirmDelete() {
-    if (pending) return;
-    setPending(true);
-
-    try {
-      const requestUrl = `${action}${action.includes("?") ? "&" : "?"}returnTo=${encodeURIComponent(returnTo || pathname)}`;
-      const response = await fetch(requestUrl, {
-        method: "POST",
-        redirect: "follow"
-      });
-
-      if (!response.ok) {
-        throw new Error(`Delete failed with status ${response.status}`);
-      }
-
-      window.location.assign(response.url);
-    } catch (error) {
-      console.error(error);
-      window.alert("The document could not be deleted. Please refresh and try again.");
-      setPending(false);
-    }
-  }
+  const requestUrl = `${action}${action.includes("?") ? "&" : "?"}returnTo=${encodeURIComponent(returnTo || pathname)}`;
 
   return (
     <>
@@ -61,14 +39,14 @@ export function DeleteDocumentButton({
             <p className="text-lg font-semibold text-ink">{title}</p>
             <p className="mt-2 text-sm leading-6 text-muted">{description}</p>
 
-            <div className="mt-5 flex justify-end gap-3">
+            <form className="mt-5 flex justify-end gap-3" action={requestUrl} method="post" onSubmit={() => setPending(true)}>
               <button className="btn btn-secondary" onClick={() => setOpen(false)} type="button">
                 Cancel
               </button>
-              <button className="btn btn-danger" disabled={pending} onClick={confirmDelete} type="button">
+              <button className="btn btn-danger" disabled={pending} type="submit">
                 {pending ? "Deleting..." : confirmLabel}
               </button>
-            </div>
+            </form>
           </div>
         </div>
       ) : null}
