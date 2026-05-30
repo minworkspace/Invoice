@@ -92,6 +92,7 @@ NEXT_PUBLIC_APP_URL="http://localhost:3000"
 SUPER_ADMIN_EMAIL="owner@example.com"
 SUPER_ADMIN_PASSWORD="change-this-password"
 SUPER_ADMIN_NAME="System Owner"
+SEED_DEMO_DATA="true"
 ```
 
 If your local MySQL root user has no password, use:
@@ -114,7 +115,7 @@ yarn prisma generate
 yarn prisma migrate dev
 ```
 
-8. Seed demo data:
+8. Seed the super admin and local demo data:
 
 ```bash
 yarn seed
@@ -143,14 +144,14 @@ If login/register shows a database setup message, check:
 - The `invoice_app` database exists.
 - `yarn prisma migrate dev` has completed.
 
-Demo login after seeding:
+Demo login after seeding with `SEED_DEMO_DATA="true"`:
 
 ```text
 Email: demo@example.com
 Password: password123
 ```
 
-If `SUPER_ADMIN_EMAIL` and `SUPER_ADMIN_PASSWORD` are set before `yarn seed`, the seed also creates a system owner login. Super admin pages are available at `/admin`; normal company users are redirected away from those routes.
+`yarn seed` always creates or updates the Super Admin from `SUPER_ADMIN_*` variables. Demo company data is only created when `SEED_DEMO_DATA="true"`. Super admin pages are available at `/admin`; normal company users are redirected away from those routes.
 
 ## Useful Commands
 
@@ -183,12 +184,12 @@ docker exec invoice-mysql mysql -uroot -ppassword -e "SHOW DATABASES;"
 docker exec invoice-mysql mysql -uroot -ppassword -D invoice_app -e "SHOW TABLES;"
 ```
 
-Full local recovery flow:
+Full local recovery flow with demo data enabled:
 
 ```bash
 yarn db:health
 yarn prisma migrate dev --name init
-yarn seed
+SEED_DEMO_DATA=true yarn seed
 ```
 
 ## PDF Handling
@@ -232,7 +233,7 @@ Company assets are stored as file paths/URLs only. MySQL does not store base64 i
 - Set `NEXT_PUBLIC_APP_URL` to your production URL so WhatsApp messages include correct links.
 - Ensure the deployed Node.js process can write to `public/uploads`. The app auto-creates nested upload/PDF folders when saving files.
 - Back up both MySQL and `public/uploads`. The database contains document metadata, while generated PDFs, logos, and chops live on disk.
-- Do not run `yarn seed` automatically in production. Use it manually only if you intentionally want to create demo data or the first super admin from `SUPER_ADMIN_*` variables.
+- Do not run `yarn seed` automatically in production. Use it manually only when you intentionally want to create or update the Super Admin. Keep `SEED_DEMO_DATA=false` in production.
 - Future storage migration path: implement `S3StorageProvider` or `CloudflareR2StorageProvider` behind `lib/storage` without changing invoice/PDF/logo business logic.
 
 ### Production Environment Variables
@@ -251,6 +252,13 @@ Optional only when manually running `yarn seed`:
 SUPER_ADMIN_EMAIL="owner@example.com"
 SUPER_ADMIN_PASSWORD="replace-with-a-strong-password"
 SUPER_ADMIN_NAME="System Owner"
+SEED_DEMO_DATA="false"
+```
+
+To create or update only the Super Admin in production after deployment, keep `SEED_DEMO_DATA=false` and run:
+
+```bash
+SEED_DEMO_DATA=false yarn seed
 ```
 
 Generate a strong `AUTH_SECRET` locally with:
@@ -280,7 +288,7 @@ Hostinger only needs `yarn run build` as the build command. The build script now
 
 The database target check prints whether `DATABASE_URL` exists, where it was read from, plus the parsed host, port, database name, and username. It never prints the password. If `prisma migrate deploy` fails, the build fails immediately, which keeps deployment errors explicit instead of shipping a half-ready app. Do not use `yarn prisma migrate dev` in production.
 
-If the build log says the database host is `localhost` or `127.0.0.1`, Hostinger is reading a stale or incorrect `DATABASE_URL`. The production `DATABASE_URL` should use the Hostinger MySQL host assigned to the database, not a local database host.
+If the build log says the database host is `localhost` or `127.0.0.1`, confirm that Hostinger lists `localhost` as the MySQL host for that exact database. Some Hostinger environments use `localhost`; others provide a separate MySQL hostname. The production `DATABASE_URL` should always use the host shown in Hostinger for the selected database.
 
 ### Standalone Output Contents
 
@@ -330,6 +338,7 @@ yarn start
 - Grant only the privileges needed for this app database.
 - Use the Hostinger MySQL host, port, database name, username, and password in `DATABASE_URL`.
 - URL-encode special characters in the database password. For example, `#` becomes `%23`, `@` becomes `%40`, `%` becomes `%25`, `/` becomes `%2F`, `?` becomes `%3F`, and `&` becomes `%26`.
+- If Prisma reports `P1000`, the app reached MySQL but MySQL rejected the username/password for that host. Re-enter the database password in Hostinger and update `DATABASE_URL` with the exact encoded password.
 - Keep regular MySQL backups before and after deployments that run migrations.
 
 ### GitHub Safety

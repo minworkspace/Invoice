@@ -76,7 +76,7 @@ function printDatabaseTarget() {
     }
 
     if (url.hostname === "localhost" || url.hostname === "127.0.0.1") {
-      console.warn("[database] Host is local. On Hostinger production this usually means DATABASE_URL is stale or set to a local value.");
+      console.warn("[database] Host is local. This is valid only if Hostinger lists localhost as the MySQL host for this database.");
     }
   } catch (error) {
     console.error("[database] DATABASE_URL exists but could not be parsed as a URL.");

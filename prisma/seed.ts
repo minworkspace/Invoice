@@ -3,7 +3,61 @@ import { DocumentType, PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
-async function main() {
+function requiredEnv(name: string) {
+  const value = process.env[name]?.trim();
+
+  if (!value) {
+    throw new Error(`${name} is required for seeding.`);
+  }
+
+  return value;
+}
+
+async function seedSuperAdmin() {
+  const superAdminEmail = requiredEnv("SUPER_ADMIN_EMAIL").toLowerCase();
+  const superAdminPassword = requiredEnv("SUPER_ADMIN_PASSWORD");
+  const superAdminName = process.env.SUPER_ADMIN_NAME?.trim() || "System Owner";
+  const superAdminHash = await bcrypt.hash(superAdminPassword, 10);
+
+  const systemCompany = await prisma.company.upsert({
+    where: { id: "system-admin-company" },
+    update: {
+      name: "System Administration",
+      email: superAdminEmail,
+      isActive: true
+    },
+    create: {
+      id: "system-admin-company",
+      name: "System Administration",
+      email: superAdminEmail
+    }
+  });
+
+  const superAdmin = await prisma.user.upsert({
+    where: { email: superAdminEmail },
+    update: {
+      companyId: systemCompany.id,
+      name: superAdminName,
+      passwordHash: superAdminHash,
+      role: "SUPER_ADMIN",
+      isActive: true
+    },
+    create: {
+      companyId: systemCompany.id,
+      name: superAdminName,
+      email: superAdminEmail,
+      passwordHash: superAdminHash,
+      role: "SUPER_ADMIN"
+    }
+  });
+
+  console.log({
+    systemCompany: systemCompany.name,
+    superAdmin: superAdmin.email
+  });
+}
+
+async function seedDemoData() {
   const passwordHash = await bcrypt.hash("password123", 10);
 
   const company = await prisma.company.upsert({
@@ -45,40 +99,6 @@ async function main() {
       role: "COMPANY_ADMIN"
     }
   });
-
-  const superAdminEmail = process.env.SUPER_ADMIN_EMAIL;
-  const superAdminPassword = process.env.SUPER_ADMIN_PASSWORD;
-  const superAdminName = process.env.SUPER_ADMIN_NAME || "System Owner";
-
-  if (superAdminEmail && superAdminPassword) {
-    const systemCompany = await prisma.company.upsert({
-      where: { id: "system-admin-company" },
-      update: {},
-      create: {
-        id: "system-admin-company",
-        name: "System Administration",
-        email: superAdminEmail
-      }
-    });
-    const superAdminHash = await bcrypt.hash(superAdminPassword, 10);
-
-    await prisma.user.upsert({
-      where: { email: superAdminEmail.toLowerCase() },
-      update: {
-        name: superAdminName,
-        passwordHash: superAdminHash,
-        role: "SUPER_ADMIN",
-        isActive: true
-      },
-      create: {
-        companyId: systemCompany.id,
-        name: superAdminName,
-        email: superAdminEmail.toLowerCase(),
-        passwordHash: superAdminHash,
-        role: "SUPER_ADMIN"
-      }
-    });
-  }
 
   const customer = await prisma.customer.upsert({
     where: { id: "demo-customer-cindy" },
@@ -264,6 +284,16 @@ async function main() {
     invoice: invoice.invoiceNumber,
     receipt: receipt.receiptNumber
   });
+}
+
+async function main() {
+  await seedSuperAdmin();
+
+  if (process.env.SEED_DEMO_DATA === "true") {
+    await seedDemoData();
+  } else {
+    console.log("Demo data skipped. Set SEED_DEMO_DATA=true to seed development demo records.");
+  }
 }
 
 main()
