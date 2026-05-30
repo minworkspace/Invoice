@@ -1,7 +1,7 @@
 import { DocumentType } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { requireCompanyUser } from "@/lib/auth";
-import { generateDocumentPdf } from "@/lib/pdf";
+import { describePdfGenerationError, generateDocumentPdf } from "@/lib/pdf";
 
 export const runtime = "nodejs";
 
@@ -39,14 +39,19 @@ export async function POST(request: Request) {
 
     return NextResponse.redirect(new URL(`/${basePath}/${documentId}?pdf=generated`, request.url), 303);
   } catch (error) {
-    console.error("PDF generation failed", {
+    console.error("PDF generation failed", describePdfGenerationError(error, {
       documentType,
-      documentId,
-      error
-    });
+      documentId
+    }));
 
     if (wantsJson) {
-      return NextResponse.json({ error: "PDF generation failed. Please try again." }, { status: 500 });
+      return NextResponse.json(
+        {
+          error:
+            "PDF generation failed. Please check the document, company settings, and uploaded logo/chop files, then try again."
+        },
+        { status: 500 }
+      );
     }
 
     return NextResponse.redirect(new URL(`/${basePath}/${documentId}?error=pdf-generation`, request.url), 303);

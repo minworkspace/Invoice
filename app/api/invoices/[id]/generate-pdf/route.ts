@@ -1,7 +1,7 @@
 import { DocumentType } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { requireCompanyUser } from "@/lib/auth";
-import { generateDocumentPdf } from "@/lib/pdf";
+import { describePdfGenerationError, generateDocumentPdf } from "@/lib/pdf";
 
 export const runtime = "nodejs";
 
@@ -16,7 +16,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       documentId: id
     });
   } catch (error) {
-    console.error("Invoice PDF generation failed", { invoiceId: id, error });
+    console.error("Invoice PDF generation failed", describePdfGenerationError(error, { invoiceId: id }));
     return NextResponse.redirect(new URL(`/invoices/${id}?error=pdf-generation`, request.url), 303);
   }
 

@@ -42,6 +42,114 @@ type PdfRenderAssets = {
   chop?: PdfImageSource | null;
 };
 
+type PdfLogContext = Record<string, unknown>;
+
+class PdfGenerationStageError extends Error {
+  stage: string;
+  details: PdfLogContext;
+  cause?: unknown;
+  code?: string;
+
+  constructor(stage: string, cause: unknown, details: PdfLogContext = {}) {
+    const causeMessage = cause instanceof Error ? cause.message : "Unknown PDF generation error.";
+    super(`PDF generation failed during ${stage}: ${causeMessage}`);
+    this.name = "PdfGenerationStageError";
+    this.stage = stage;
+    this.details = safeLogContext(details);
+    this.cause = cause;
+
+    if (isRecord(cause) && typeof cause.code === "string") {
+      this.code = cause.code;
+    }
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function safeLogValue(value: unknown): unknown {
+  if (value === undefined) return undefined;
+  if (value === null || typeof value === "boolean" || typeof value === "number") return value;
+  if (typeof value === "string") return value.length > 260 ? `${value.slice(0, 257)}...` : value;
+  if (Buffer.isBuffer(value)) return { type: "Buffer", bytes: value.length };
+  if (value instanceof Uint8Array) return { type: value.constructor.name, bytes: value.byteLength };
+  if (value instanceof Date) return value.toISOString();
+  if (Array.isArray(value)) return value.map(safeLogValue);
+  if (isRecord(value)) {
+    return Object.fromEntries(
+      Object.entries(value)
+        .map(([key, nestedValue]) => [key, safeLogValue(nestedValue)])
+        .filter(([, nestedValue]) => nestedValue !== undefined)
+    );
+  }
+
+  return String(value);
+}
+
+function safeLogContext(context: PdfLogContext = {}) {
+  return Object.fromEntries(
+    Object.entries(context)
+      .map(([key, value]) => [key, safeLogValue(value)])
+      .filter(([, value]) => value !== undefined)
+  );
+}
+
+function summarizeUnknownError(error: unknown): PdfLogContext {
+  if (error instanceof PdfGenerationStageError) {
+    return {
+      name: error.name,
+      message: error.message,
+      code: error.code,
+      stage: error.stage,
+      details: error.details,
+      cause: summarizeUnknownError(error.cause)
+    };
+  }
+
+  if (error instanceof Error) {
+    const extra = error as Error & Record<string, unknown>;
+    return {
+      name: error.name,
+      message: error.message,
+      code: typeof extra.code === "string" ? extra.code : undefined,
+      syscall: typeof extra.syscall === "string" ? extra.syscall : undefined,
+      path: typeof extra.path === "string" ? path.basename(extra.path) : undefined,
+      constructorName: error.constructor.name,
+      stack: process.env.NODE_ENV !== "production" ? error.stack : undefined
+    };
+  }
+
+  return {
+    name: typeof error,
+    message: typeof error === "string" ? error : "Non-Error value thrown.",
+    value: safeLogValue(error)
+  };
+}
+
+export function describePdfGenerationError(error: unknown, context: PdfLogContext = {}) {
+  return {
+    ...safeLogContext(context),
+    error: summarizeUnknownError(error)
+  };
+}
+
+function withPdfStage<T>(stage: string, details: PdfLogContext, action: () => T): T {
+  try {
+    return action();
+  } catch (error) {
+    throw new PdfGenerationStageError(stage, error, details);
+  }
+}
+
+async function withAsyncPdfStage<T>(stage: string, details: PdfLogContext, action: () => Promise<T>): Promise<T> {
+  try {
+    return await action();
+  } catch (error) {
+    throw new PdfGenerationStageError(stage, error, details);
+  }
+}
+
 function ensurePdfKitStandardFontData() {
   if (pdfKitFontsReady) return;
 
@@ -108,14 +216,27 @@ async function optionalSharpPngBuffer(filePath: string) {
 }
 
 async function loadPdfImageSource(assetUrl?: string | null): Promise<PdfImageSource | null> {
-  const filePath = companyAssetPublicUrlToAbsolutePath(assetUrl);
-  if (!filePath || !fs.existsSync(filePath)) return null;
+  if (!assetUrl) return null;
 
-  const extension = path.extname(filePath).toLowerCase();
-  if ([".png", ".jpg", ".jpeg"].includes(extension)) return filePath;
-  if (extension === ".webp") return optionalSharpPngBuffer(filePath);
+  try {
+    const filePath = companyAssetPublicUrlToAbsolutePath(assetUrl);
+    if (!filePath || !fs.existsSync(filePath)) return null;
 
-  return null;
+    const extension = path.extname(filePath).toLowerCase();
+    if ([".png", ".jpg", ".jpeg"].includes(extension)) return filePath;
+    if (extension === ".webp") return optionalSharpPngBuffer(filePath);
+
+    return null;
+  } catch (error) {
+    console.warn(
+      "PDF asset skipped",
+      describePdfGenerationError(error, {
+        assetExtension: path.extname(assetUrl.split("?")[0] || "").toLowerCase() || null,
+        hasAssetUrl: Boolean(assetUrl)
+      })
+    );
+    return null;
+  }
 }
 
 async function preparePdfAssets(company: { settings?: { logoUrl?: string | null; chopUrl?: string | null } | null }) {
@@ -158,7 +279,16 @@ function drawLogoBox(
       });
       doc.restore();
       return;
-    } catch {
+    } catch (error) {
+      console.warn(
+        "PDF logo skipped",
+        describePdfGenerationError(error, {
+          assetType: "logo",
+          imageSourceType: Buffer.isBuffer(imageSource) ? "buffer" : "file",
+          width,
+          height
+        })
+      );
       // Fall through to a text fallback if PDFKit cannot embed the source.
     }
   }
@@ -199,7 +329,16 @@ function drawChopBox(
         align: "center",
         valign: "center"
       });
-    } catch {
+    } catch (error) {
+      console.warn(
+        "PDF chop skipped",
+        describePdfGenerationError(error, {
+          assetType: "chop",
+          imageSourceType: Buffer.isBuffer(imageSource) ? "buffer" : "file",
+          width,
+          height
+        })
+      );
       // Optional stamp should never break PDF generation.
     }
   }
@@ -1285,15 +1424,49 @@ function writePaginatedClassicDocumentPdf(
   }
 }
 
-async function finishPdf(doc: PDFKit.PDFDocument) {
+function pdfChunkToBuffer(chunk: unknown) {
+  if (Buffer.isBuffer(chunk)) return chunk;
+  if (chunk instanceof Uint8Array) return Buffer.from(chunk);
+  if (chunk instanceof ArrayBuffer) return Buffer.from(chunk);
+  if (typeof chunk === "string") return Buffer.from(chunk);
+
+  throw new PdfGenerationStageError("buffer-pdf-chunk", new TypeError("PDFKit emitted an unsupported data chunk."), {
+    chunkType: typeof chunk,
+    chunkConstructor: isRecord(chunk) && chunk.constructor ? chunk.constructor.name : null
+  });
+}
+
+async function finishPdf(doc: PDFKit.PDFDocument, details: PdfLogContext) {
   return new Promise<Buffer>((resolve, reject) => {
     const chunks: Buffer[] = [];
+    let settled = false;
 
-    doc.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
-    doc.on("end", () => resolve(Buffer.concat(chunks)));
-    doc.on("error", reject);
-    addPdfPageNumbers(doc);
-    doc.end();
+    const fail = (error: unknown) => {
+      if (settled) return;
+      settled = true;
+      reject(error instanceof PdfGenerationStageError ? error : new PdfGenerationStageError("finish-pdf", error, details));
+    };
+
+    doc.on("data", (chunk) => {
+      try {
+        chunks.push(pdfChunkToBuffer(chunk));
+      } catch (error) {
+        fail(error);
+      }
+    });
+    doc.on("end", () => {
+      if (settled) return;
+      settled = true;
+      resolve(Buffer.concat(chunks));
+    });
+    doc.on("error", fail);
+
+    try {
+      addPdfPageNumbers(doc);
+      doc.end();
+    } catch (error) {
+      fail(error);
+    }
   });
 }
 
@@ -1324,6 +1497,57 @@ async function saveGeneratedPdf({
   return stored.url;
 }
 
+function pdfDocumentContext(
+  documentType: DocumentType,
+  document: {
+    id: string;
+    companyId: string;
+    templateKey?: string | null;
+    pdfUrl?: string | null;
+    company?: {
+      email?: string | null;
+      phone?: string | null;
+      address?: string | null;
+      settings?: {
+        logoUrl?: string | null;
+        chopUrl?: string | null;
+        paymentInfo?: string | null;
+        defaultImportantNotes?: string | null;
+        ssmNumber?: string | null;
+      } | null;
+    } | null;
+    customer?: {
+      address?: string | null;
+    } | null;
+    items?: unknown[];
+    paymentInfo?: string | null;
+    importantNotes?: string | null;
+    remarks?: string | null;
+  }
+) {
+  return safeLogContext({
+    documentType,
+    documentId: document.id,
+    companyId: document.companyId,
+    templateKey: document.templateKey || "classic",
+    hasPreviousPdfUrl: Boolean(document.pdfUrl),
+    itemCount: document.items?.length ?? 0,
+    hasCompanySettings: Boolean(document.company?.settings),
+    hasLogoUrl: Boolean(document.company?.settings?.logoUrl),
+    logoExtension: document.company?.settings?.logoUrl ? path.extname(document.company.settings.logoUrl.split("?")[0] || "").toLowerCase() : null,
+    hasChopUrl: Boolean(document.company?.settings?.chopUrl),
+    chopExtension: document.company?.settings?.chopUrl ? path.extname(document.company.settings.chopUrl.split("?")[0] || "").toLowerCase() : null,
+    hasCompanyEmail: Boolean(document.company?.email),
+    hasCompanyPhone: Boolean(document.company?.phone),
+    hasCompanyAddress: Boolean(document.company?.address),
+    hasCompanySsm: Boolean(document.company?.settings?.ssmNumber),
+    hasCustomerAddress: Boolean(document.customer?.address),
+    hasPaymentInfo: Boolean(document.paymentInfo || document.company?.settings?.paymentInfo),
+    hasImportantNotes: Boolean(document.importantNotes || document.company?.settings?.defaultImportantNotes),
+    hasRemarks: Boolean(document.remarks)
+  });
+}
+
 async function generateInvoicePdf(companyId: string, documentId: string) {
   const invoice = await prisma.invoice.findFirst({
     where: { id: documentId, companyId },
@@ -1336,9 +1560,14 @@ async function generateInvoicePdf(companyId: string, documentId: string) {
   });
   if (!invoice) throw new Error("Invoice not found.");
 
-  ensurePdfKitStandardFontData();
-  const assets = await preparePdfAssets(invoice.company);
-  const doc = new PDFDocument({ size: "A4", margin: 0, autoFirstPage: false, bufferPages: true });
+  const context = pdfDocumentContext(DocumentType.INVOICE, invoice);
+  withPdfStage("prepare-fonts", context, () => ensurePdfKitStandardFontData());
+  const assets = await withAsyncPdfStage("prepare-assets", context, () => preparePdfAssets(invoice.company));
+  const doc = withPdfStage(
+    "create-pdf-document",
+    context,
+    () => new PDFDocument({ size: "A4", margin: 0, autoFirstPage: false, bufferPages: true })
+  );
   const template = getDocumentTemplate(invoice.templateKey);
   const pdfOptions = {
     kind: "invoice" as const,
@@ -1357,29 +1586,36 @@ async function generateInvoicePdf(companyId: string, documentId: string) {
     assets
   };
 
-  if (template.key === "clean") {
-    writePaginatedCleanDocumentPdf(doc, pdfOptions);
-  } else {
-    writePaginatedClassicDocumentPdf(doc, pdfOptions);
-  }
-
-  const pdfBuffer = await finishPdf(doc);
-  const pdfUrl = await saveGeneratedPdf({
-    companyId,
-    documentType: "invoice",
-    documentId: invoice.id,
-    previousUrl: invoice.pdfUrl,
-    data: pdfBuffer
-  });
-
-  await prisma.invoice.update({
-    where: { id: invoice.id },
-    data: {
-      pdfUrl,
-      pdfGeneratedAt: new Date(),
-      pdfNeedsRegeneration: false
+  withPdfStage("render-pdf", { ...context, resolvedTemplateKey: template.key }, () => {
+    if (template.key === "clean") {
+      writePaginatedCleanDocumentPdf(doc, pdfOptions);
+    } else {
+      writePaginatedClassicDocumentPdf(doc, pdfOptions);
     }
   });
+
+  const pdfBuffer = await finishPdf(doc, { ...context, resolvedTemplateKey: template.key });
+  const storageKey = documentPdfKey(companyId, "invoice", invoice.id);
+  const pdfUrl = await withAsyncPdfStage("save-pdf", { ...context, storageKey, bytes: pdfBuffer.length }, () =>
+    saveGeneratedPdf({
+      companyId,
+      documentType: "invoice",
+      documentId: invoice.id,
+      previousUrl: invoice.pdfUrl,
+      data: pdfBuffer
+    })
+  );
+
+  await withAsyncPdfStage("update-document-record", context, () =>
+    prisma.invoice.update({
+      where: { id: invoice.id },
+      data: {
+        pdfUrl,
+        pdfGeneratedAt: new Date(),
+        pdfNeedsRegeneration: false
+      }
+    })
+  );
 
   return pdfUrl;
 }
@@ -1395,9 +1631,14 @@ async function generateQuotationPdf(companyId: string, documentId: string) {
   });
   if (!quotation) throw new Error("Quotation not found.");
 
-  ensurePdfKitStandardFontData();
-  const assets = await preparePdfAssets(quotation.company);
-  const doc = new PDFDocument({ size: "A4", margin: 0, autoFirstPage: false, bufferPages: true });
+  const context = pdfDocumentContext(DocumentType.QUOTATION, quotation);
+  withPdfStage("prepare-fonts", context, () => ensurePdfKitStandardFontData());
+  const assets = await withAsyncPdfStage("prepare-assets", context, () => preparePdfAssets(quotation.company));
+  const doc = withPdfStage(
+    "create-pdf-document",
+    context,
+    () => new PDFDocument({ size: "A4", margin: 0, autoFirstPage: false, bufferPages: true })
+  );
   const template = getDocumentTemplate(quotation.templateKey);
   const pdfOptions = {
     kind: "quotation" as const,
@@ -1413,28 +1654,35 @@ async function generateQuotationPdf(companyId: string, documentId: string) {
     assets
   };
 
-  if (template.key === "clean") {
-    writePaginatedCleanDocumentPdf(doc, pdfOptions);
-  } else {
-    writePaginatedClassicDocumentPdf(doc, pdfOptions);
-  }
-
-  const pdfBuffer = await finishPdf(doc);
-  const pdfUrl = await saveGeneratedPdf({
-    companyId,
-    documentType: "quotation",
-    documentId: quotation.id,
-    previousUrl: quotation.pdfUrl,
-    data: pdfBuffer
-  });
-  await prisma.quotation.update({
-    where: { id: quotation.id },
-    data: {
-      pdfUrl,
-      pdfGeneratedAt: new Date(),
-      pdfNeedsRegeneration: false
+  withPdfStage("render-pdf", { ...context, resolvedTemplateKey: template.key }, () => {
+    if (template.key === "clean") {
+      writePaginatedCleanDocumentPdf(doc, pdfOptions);
+    } else {
+      writePaginatedClassicDocumentPdf(doc, pdfOptions);
     }
   });
+
+  const pdfBuffer = await finishPdf(doc, { ...context, resolvedTemplateKey: template.key });
+  const storageKey = documentPdfKey(companyId, "quotation", quotation.id);
+  const pdfUrl = await withAsyncPdfStage("save-pdf", { ...context, storageKey, bytes: pdfBuffer.length }, () =>
+    saveGeneratedPdf({
+      companyId,
+      documentType: "quotation",
+      documentId: quotation.id,
+      previousUrl: quotation.pdfUrl,
+      data: pdfBuffer
+    })
+  );
+  await withAsyncPdfStage("update-document-record", context, () =>
+    prisma.quotation.update({
+      where: { id: quotation.id },
+      data: {
+        pdfUrl,
+        pdfGeneratedAt: new Date(),
+        pdfNeedsRegeneration: false
+      }
+    })
+  );
 
   return pdfUrl;
 }
@@ -1454,9 +1702,20 @@ async function generateReceiptPdf(companyId: string, documentId: string) {
   });
   if (!receipt) throw new Error("Receipt not found.");
 
-  ensurePdfKitStandardFontData();
-  const assets = await preparePdfAssets(receipt.company);
-  const doc = new PDFDocument({ size: "A4", margin: 0, autoFirstPage: false, bufferPages: true });
+  const context = pdfDocumentContext(DocumentType.RECEIPT, {
+    ...receipt,
+    items: receipt.invoice.items,
+    paymentInfo: receipt.company.settings?.paymentInfo,
+    importantNotes: receipt.company.settings?.defaultImportantNotes,
+    remarks: receipt.notes
+  });
+  withPdfStage("prepare-fonts", context, () => ensurePdfKitStandardFontData());
+  const assets = await withAsyncPdfStage("prepare-assets", context, () => preparePdfAssets(receipt.company));
+  const doc = withPdfStage(
+    "create-pdf-document",
+    context,
+    () => new PDFDocument({ size: "A4", margin: 0, autoFirstPage: false, bufferPages: true })
+  );
   const template = getDocumentTemplate(receipt.templateKey);
   const pdfOptions = {
     kind: "receipt" as const,
@@ -1473,28 +1732,35 @@ async function generateReceiptPdf(companyId: string, documentId: string) {
     assets
   };
 
-  if (template.key === "clean") {
-    writePaginatedCleanDocumentPdf(doc, pdfOptions);
-  } else {
-    writePaginatedClassicDocumentPdf(doc, pdfOptions);
-  }
-
-  const pdfBuffer = await finishPdf(doc);
-  const pdfUrl = await saveGeneratedPdf({
-    companyId,
-    documentType: "receipt",
-    documentId: receipt.id,
-    previousUrl: receipt.pdfUrl,
-    data: pdfBuffer
-  });
-  await prisma.receipt.update({
-    where: { id: receipt.id },
-    data: {
-      pdfUrl,
-      pdfGeneratedAt: new Date(),
-      pdfNeedsRegeneration: false
+  withPdfStage("render-pdf", { ...context, resolvedTemplateKey: template.key }, () => {
+    if (template.key === "clean") {
+      writePaginatedCleanDocumentPdf(doc, pdfOptions);
+    } else {
+      writePaginatedClassicDocumentPdf(doc, pdfOptions);
     }
   });
+
+  const pdfBuffer = await finishPdf(doc, { ...context, resolvedTemplateKey: template.key });
+  const storageKey = documentPdfKey(companyId, "receipt", receipt.id);
+  const pdfUrl = await withAsyncPdfStage("save-pdf", { ...context, storageKey, bytes: pdfBuffer.length }, () =>
+    saveGeneratedPdf({
+      companyId,
+      documentType: "receipt",
+      documentId: receipt.id,
+      previousUrl: receipt.pdfUrl,
+      data: pdfBuffer
+    })
+  );
+  await withAsyncPdfStage("update-document-record", context, () =>
+    prisma.receipt.update({
+      where: { id: receipt.id },
+      data: {
+        pdfUrl,
+        pdfGeneratedAt: new Date(),
+        pdfNeedsRegeneration: false
+      }
+    })
+  );
 
   return pdfUrl;
 }

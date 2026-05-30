@@ -69,6 +69,14 @@ export class LocalStorageProvider implements StorageProvider {
   }
 
   async saveFile(input: SaveFileInput) {
+    if (!input?.key || typeof input.key !== "string") {
+      throw new TypeError("Storage save failed: key must be a non-empty string.");
+    }
+
+    if (!input.data) {
+      throw new TypeError("Storage save failed: file data is empty.");
+    }
+
     const absolutePath = this.absolutePathFor(input.key);
     if (!absolutePath) throw new Error("Invalid storage key.");
 

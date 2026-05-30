@@ -16,7 +16,7 @@ export default async function InvoiceDetailPage({
   searchParams
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ pdf?: string; created?: string }>;
+  searchParams: Promise<{ pdf?: string; created?: string; error?: string }>;
 }) {
   const user = await requireCompanyUser();
   const { id } = await params;
@@ -99,6 +99,12 @@ export default async function InvoiceDetailPage({
       {query.pdf === "generated" ? (
         <div className="mb-4 rounded-md border border-[#4C9A68]/25 bg-[#E9F7EE] px-3 py-2 text-sm text-[#2F7047]">
           PDF generated successfully. Use Download PDF to save a copy.
+        </div>
+      ) : null}
+
+      {query.error === "pdf-generation" ? (
+        <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          PDF generation failed. Please check company settings and uploaded logo/chop files, then try again.
         </div>
       ) : null}
 
