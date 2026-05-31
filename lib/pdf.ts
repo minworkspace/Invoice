@@ -1149,14 +1149,26 @@ function writeClassicPageHeader(
   drawLogoBox(doc, options.company, INVOICE_LOGO_BOX.x, INVOICE_LOGO_BOX.y, INVOICE_LOGO_BOX.width, INVOICE_LOGO_BOX.height, false, options.assets?.logo);
 
   doc.fillColor("#111111").font("Helvetica-Bold").fontSize(10).text("FROM:", 47, 169);
-  doc.fontSize(9).text(sanitizeDocumentText(options.company.name), 47, 185, { width: 175 });
+  const companyName = sanitizeDocumentText(options.company.name);
+  const companyX = 47;
+  const companyWidth = 175;
+  const companyNameY = 185;
+
+  doc.font("Helvetica-Bold").fontSize(9);
+  doc.text(companyName, companyX, companyNameY, { width: companyWidth });
+
+  let companyDetailsY = companyNameY + doc.heightOfString(companyName, { width: companyWidth }) + 4;
   if (options.company.settings?.ssmNumber) {
-    doc.font("Helvetica-Oblique").fontSize(9).text(`(SSM: ${sanitizeDocumentText(options.company.settings.ssmNumber)})`, 47, 201, { width: 175 });
+    const ssmText = `(SSM: ${sanitizeDocumentText(options.company.settings.ssmNumber)})`;
+    doc.font("Helvetica-Oblique").fontSize(9).text(ssmText, companyX, companyDetailsY, { width: companyWidth });
+    companyDetailsY += doc.heightOfString(ssmText, { width: companyWidth }) + 8;
+  } else {
+    companyDetailsY += 8;
   }
   doc.font("Helvetica").fontSize(9).text(
     joinDocumentText([options.company.email, options.company.phone, options.company.address]),
-    47,
-    options.company.settings?.ssmNumber ? 217 : 213,
+    companyX,
+    companyDetailsY,
     { width: 175, lineGap: 3 }
   );
 

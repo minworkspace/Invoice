@@ -115,7 +115,7 @@ export async function getSuggestedDocumentNumber(companyId: string, documentType
     }
   });
   const config = settingsForType(settings, documentType);
-  const nextNumber = sequence ? sequence.currentNumber + 1 : config.startNumber;
+  const nextNumber = sequence ? Math.max(sequence.currentNumber + 1, config.startNumber) : config.startNumber;
 
   return nextUnusedDocumentNumber(prisma, companyId, documentType, config.prefix, nextNumber, settings.documentNumberPadding);
 }
@@ -146,6 +146,15 @@ export async function reserveDocumentNumberTx(
       currentNumber: config.startNumber
     }
   });
+
+  if (sequence.currentNumber < config.startNumber) {
+    sequence = await tx.documentNumberSequence.update({
+      where: { id: sequence.id },
+      data: {
+        currentNumber: config.startNumber
+      }
+    });
+  }
 
   for (let attempts = 0; attempts < 1000; attempts += 1) {
     const candidate = formatDocumentNumber(config.prefix, sequence.currentNumber, settings.documentNumberPadding);

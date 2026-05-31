@@ -2,6 +2,7 @@ import { DocumentType } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { requireCompanyUser } from "@/lib/auth";
 import { describePdfGenerationError, generateDocumentPdf } from "@/lib/pdf";
+import { localRedirect } from "@/lib/redirect-response";
 
 export const runtime = "nodejs";
 
@@ -37,7 +38,7 @@ export async function POST(request: Request) {
       });
     }
 
-    return NextResponse.redirect(new URL(`/${basePath}/${documentId}?pdf=generated`, request.url), 303);
+    return localRedirect(`/${basePath}/${documentId}?pdf=generated`);
   } catch (error) {
     console.error("PDF generation failed", describePdfGenerationError(error, {
       documentType,
@@ -54,6 +55,6 @@ export async function POST(request: Request) {
       );
     }
 
-    return NextResponse.redirect(new URL(`/${basePath}/${documentId}?error=pdf-generation`, request.url), 303);
+    return localRedirect(`/${basePath}/${documentId}?error=pdf-generation`);
   }
 }

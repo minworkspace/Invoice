@@ -1,12 +1,12 @@
 import { DocumentType } from "@prisma/client";
-import { NextResponse } from "next/server";
 import { normalizeDocumentTemplateKey } from "@/components/document-templates/template-registry";
 import { requireCompanyUser } from "@/lib/auth";
 import { ensureCompanySettingsTx } from "@/lib/company-settings";
 import { reserveDocumentNumberTx } from "@/lib/numbering";
 import { prisma } from "@/lib/prisma";
+import { localRedirect } from "@/lib/redirect-response";
 
-export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await requireCompanyUser();
   const { id } = await params;
 
@@ -54,5 +54,5 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     });
   });
 
-  return NextResponse.redirect(new URL(`/invoices/${invoice.id}?created=from-quotation`, request.url), 303);
+  return localRedirect(`/invoices/${invoice.id}?created=from-quotation`);
 }
