@@ -101,6 +101,8 @@ export default async function EditReceiptPage({
         }}
         invoice={{
           invoiceNumber: receipt.invoice.invoiceNumber,
+          total: decimalInput(receipt.invoice.total),
+          refundableDeposit: decimalInput(receipt.invoice.refundableDeposit),
           items: receipt.invoice.items.map((item) => ({
             description: item.description,
             lineTotal: decimalInput(item.lineTotal)

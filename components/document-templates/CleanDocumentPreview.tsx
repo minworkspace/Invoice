@@ -136,10 +136,10 @@ export function CleanDocumentPreview({
 }: CleanDocumentPreviewProps) {
   const title = documentTitle(kind);
   const deposit = numeric(refundableDeposit);
-  const displayTotal = kind === "invoice" ? numeric(total) + deposit : numeric(total);
-  const balanceDue = kind === "invoice" ? Math.max(displayTotal - numeric(paidAmount), 0) : displayTotal;
+  const displayTotal = kind === "invoice" || kind === "receipt" ? numeric(total) + deposit : numeric(total);
+  const balanceDue = kind === "invoice" || kind === "receipt" ? Math.max(displayTotal - numeric(paidAmount), 0) : displayTotal;
   const amountLabel = kind === "receipt" ? "Amount Paid:" : kind === "invoice" ? "Balance Due:" : "Total:";
-  const amountValue = kind === "receipt" ? numeric(paidAmount ?? total) : balanceDue;
+  const amountValue = kind === "receipt" ? numeric(paidAmount ?? displayTotal) : balanceDue;
   const muted = "text-[#6D6D6D]";
   const tableGridStyle = {
     gridTemplateColumns: [
@@ -169,7 +169,7 @@ export function CleanDocumentPreview({
     ? printableItems
     : [{ description: previewMode ? "Item description" : "", lineTotal: 0, showQuantity: false }];
   const allItems =
-    kind === "invoice" && deposit > 0
+    (kind === "invoice" || kind === "receipt") && deposit > 0
       ? [...displayItems, { description: "Refundable Deposit", lineTotal: deposit, showQuantity: false }]
       : displayItems;
   const itemHeight = (item: CleanPreviewItem) =>
@@ -304,7 +304,13 @@ export function CleanDocumentPreview({
           {kind === "receipt" ? (
             <>
               <p className={muted}>Paid:</p>
-              <p>{cleanMoney(paidAmount ?? total)}</p>
+              <p>{cleanMoney(paidAmount ?? displayTotal)}</p>
+              {balanceDue > 0 ? (
+                <>
+                  <p className="font-bold">Balance Due:</p>
+                  <p className="font-bold">{cleanMoney(balanceDue)}</p>
+                </>
+              ) : null}
             </>
           ) : null}
         </div>

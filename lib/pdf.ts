@@ -767,10 +767,12 @@ function writeCleanDocumentPdf(
   const rateX = qtyX + 70;
   const amountX = rateX + 82;
   const total = cleanNumber(options.total);
+  const deposit = cleanNumber(options.refundableDeposit);
   const paidAmount = cleanNumber(options.paidAmount);
-  const balanceDue = options.kind === "invoice" ? Math.max(total - paidAmount, 0) : total;
+  const displayTotal = options.kind === "invoice" || options.kind === "receipt" ? total + deposit : total;
+  const balanceDue = options.kind === "invoice" || options.kind === "receipt" ? Math.max(displayTotal - paidAmount, 0) : displayTotal;
   const summaryLabel = options.kind === "receipt" ? "Amount Paid:" : options.kind === "invoice" ? "Balance Due:" : "Total:";
-  const summaryAmount = options.kind === "receipt" ? paidAmount || total : balanceDue;
+  const summaryAmount = options.kind === "receipt" ? paidAmount || displayTotal : balanceDue;
 
   writeCleanCompanyBlock(doc, options.company, left, 42);
 
@@ -837,7 +839,7 @@ function writeCleanDocumentPdf(
     ? options.items
     : [{ description: "", quantity: "", showQuantity: false, unitPrice: 0, lineTotal: 0 }];
   const allItems =
-    options.kind === "invoice" && cleanNumber(options.refundableDeposit) > 0
+    (options.kind === "invoice" || options.kind === "receipt") && deposit > 0
       ? [
           ...items,
           {
@@ -845,7 +847,7 @@ function writeCleanDocumentPdf(
             quantity: "",
             showQuantity: false,
             unitPrice: 0,
-            lineTotal: options.refundableDeposit
+            lineTotal: deposit
           }
         ]
       : items;
@@ -884,12 +886,12 @@ function writeCleanDocumentPdf(
   }
 
   y += 42;
-  const totals: Array<[string, unknown, boolean?]> = [["Total:", options.total, false]];
-  if (options.kind === "invoice" && paidAmount > 0) {
-    totals.push(["Paid:", options.paidAmount, false], ["Balance Due:", balanceDue, true]);
-  }
-  if (options.kind === "receipt") {
-    totals.push(["Paid:", options.paidAmount || options.total, false]);
+  const totals: Array<[string, unknown, boolean?]> = [["Total:", displayTotal, false]];
+  if ((options.kind === "invoice" || options.kind === "receipt") && paidAmount > 0) {
+    totals.push(["Paid:", options.paidAmount, false]);
+    if (balanceDue > 0) totals.push(["Balance Due:", balanceDue, true]);
+  } else if (options.kind === "receipt") {
+    totals.push(["Paid:", displayTotal, false]);
   }
 
   totals.forEach(([label, value, emphasized], index) => {
@@ -1047,11 +1049,12 @@ function writeCleanPageHeader(
 ) {
   const title = options.kind === "quotation" ? "QUOTATION" : options.kind === "receipt" ? "RECEIPT" : "INVOICE";
   const total = cleanNumber(options.total);
-  const displayTotal = options.kind === "invoice" ? total + cleanNumber(options.refundableDeposit) : total;
+  const deposit = cleanNumber(options.refundableDeposit);
+  const displayTotal = options.kind === "invoice" || options.kind === "receipt" ? total + deposit : total;
   const paidAmount = cleanNumber(options.paidAmount);
-  const balanceDue = options.kind === "invoice" ? Math.max(displayTotal - paidAmount, 0) : displayTotal;
+  const balanceDue = options.kind === "invoice" || options.kind === "receipt" ? Math.max(displayTotal - paidAmount, 0) : displayTotal;
   const summaryLabel = options.kind === "receipt" ? "Amount Paid:" : options.kind === "invoice" ? "Balance Due:" : "Total:";
-  const summaryAmount = options.kind === "receipt" ? paidAmount || total : balanceDue;
+  const summaryAmount = options.kind === "receipt" ? paidAmount || displayTotal : balanceDue;
 
   writeCleanCompanyBlock(doc, options.company, 42, 42);
   doc.fillColor("#333333").font("Helvetica").fontSize(34).text(title, CLEAN_TITLE.x, 42, {
@@ -1231,12 +1234,14 @@ function writeClassicPdfRow(
 
 function classicTotalRows(options: PdfDocumentOptions) {
   const total = cleanNumber(options.total);
-  const displayTotal = options.kind === "invoice" ? total + cleanNumber(options.refundableDeposit) : total;
+  const displayTotal = options.kind === "invoice" || options.kind === "receipt" ? total + cleanNumber(options.refundableDeposit) : total;
   const paidAmount = cleanNumber(options.paidAmount);
   const rows: Array<[string, unknown]> = [["TOTAL", displayTotal]];
 
   if (options.kind === "receipt") {
-    rows.push(["PAID", options.paidAmount || options.total]);
+    rows.push(["PAID", paidAmount > 0 ? options.paidAmount : displayTotal]);
+    const balanceDue = Math.max(displayTotal - (paidAmount || displayTotal), 0);
+    if (balanceDue > 0) rows.push(["BALANCE", balanceDue]);
   } else if (options.kind === "invoice" && paidAmount > 0) {
     rows.push(["PAID", options.paidAmount]);
     const balanceDue = Math.max(displayTotal - paidAmount, 0);
@@ -1277,7 +1282,7 @@ function writePaginatedCleanDocumentPdf(
 ) {
   options = sanitizePdfOptions(options);
   const baseItems = preparePdfItems(
-    options.kind === "invoice" && cleanNumber(options.refundableDeposit) > 0
+    (options.kind === "invoice" || options.kind === "receipt") && cleanNumber(options.refundableDeposit) > 0
       ? [
           ...options.items,
           {
@@ -1322,13 +1327,16 @@ function writePaginatedCleanDocumentPdf(
   }
 
   const total = cleanNumber(options.total);
-  const displayTotal = options.kind === "invoice" ? total + cleanNumber(options.refundableDeposit) : total;
+  const displayTotal = options.kind === "invoice" || options.kind === "receipt" ? total + cleanNumber(options.refundableDeposit) : total;
   const paidAmount = cleanNumber(options.paidAmount);
   const rows: Array<[string, unknown, boolean?]> = [["Total:", displayTotal, false]];
-  if (options.kind === "invoice" && paidAmount > 0) {
-    rows.push(["Paid:", options.paidAmount, false], ["Balance Due:", Math.max(displayTotal - paidAmount, 0), true]);
+  if ((options.kind === "invoice" || options.kind === "receipt") && paidAmount > 0) {
+    const balanceDue = Math.max(displayTotal - paidAmount, 0);
+    rows.push(["Paid:", options.paidAmount, false]);
+    if (balanceDue > 0) rows.push(["Balance Due:", balanceDue, true]);
+  } else if (options.kind === "receipt") {
+    rows.push(["Paid:", displayTotal, false]);
   }
-  if (options.kind === "receipt") rows.push(["Paid:", options.paidAmount || options.total, false]);
 
   rows.forEach(([label, value, emphasized], index) => {
     const rowY = y + index * 20;
@@ -1372,7 +1380,7 @@ function writePaginatedClassicDocumentPdf(
 ) {
   options = sanitizePdfOptions(options);
   const baseItems = preparePdfItems(
-    options.kind === "invoice" && cleanNumber(options.refundableDeposit) > 0
+    (options.kind === "invoice" || options.kind === "receipt") && cleanNumber(options.refundableDeposit) > 0
       ? [
           ...options.items,
           {
@@ -1762,8 +1770,9 @@ async function generateReceiptPdf(companyId: string, documentId: string) {
     documentNumber: receipt.receiptNumber,
     issueDate: receipt.receiptDate,
     items: receipt.invoice.items,
-    total: receipt.amount,
+    total: receipt.invoice.total,
     paidAmount: receipt.amount,
+    refundableDeposit: receipt.invoice.refundableDeposit,
     paymentInfo: receipt.company.settings?.paymentInfo,
     importantNotes: receipt.company.settings?.defaultImportantNotes,
     remarks: receipt.notes,

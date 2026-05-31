@@ -117,11 +117,12 @@ export function ClassicDocumentPreview({
   const printableItems = items.filter((item) => hasDocumentText(item.description) || numeric(item.lineTotal || item.unitPrice) > 0);
   const deposit = numeric(refundableDeposit);
   const paid = numeric(paidAmount);
-  const displayTotal = kind === "invoice" ? numeric(total) + deposit : numeric(total);
-  const balanceDue = kind === "invoice" ? Math.max(displayTotal - paid, 0) : 0;
+  const displayTotal = kind === "invoice" || kind === "receipt" ? numeric(total) + deposit : numeric(total);
+  const balanceDue = kind === "invoice" || kind === "receipt" ? Math.max(displayTotal - paid, 0) : 0;
   const totalRows: Array<[string, string | number | null | undefined]> = [["TOTAL", displayTotal]];
   if (kind === "receipt") {
-    totalRows.push(["PAID", paidAmount ?? total]);
+    totalRows.push(["PAID", paid > 0 ? paidAmount : displayTotal]);
+    if (balanceDue > 0) totalRows.push(["BALANCE", balanceDue]);
   } else if (kind === "invoice" && paid > 0) {
     totalRows.push(["PAID", paidAmount]);
     if (balanceDue > 0) totalRows.push(["BALANCE", balanceDue]);
@@ -135,7 +136,7 @@ export function ClassicDocumentPreview({
     ? printableItems
     : [{ description: previewMode ? "Item description" : "", lineTotal: 0, showQuantity: false }];
   const allItems =
-    kind === "invoice" && deposit > 0
+    (kind === "invoice" || kind === "receipt") && deposit > 0
       ? [...displayItems, { description: "Refundable Deposit", lineTotal: deposit, showQuantity: false }]
       : displayItems;
   const itemHeight = (item: ClassicPreviewItem) =>

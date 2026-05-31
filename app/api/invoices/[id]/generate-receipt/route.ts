@@ -20,7 +20,8 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     if (invoice.receipt) return invoice.receipt;
 
     const receiptNumber = await reserveDocumentNumberTx(tx, user.companyId, DocumentType.RECEIPT);
-    const amount = invoice.paidAmount.toString() === "0" ? invoice.total : invoice.paidAmount;
+    const fullInvoiceAmount = invoice.total.plus(invoice.refundableDeposit);
+    const amount = invoice.paidAmount.toString() === "0" ? fullInvoiceAmount : invoice.paidAmount;
     const settings = await ensureCompanySettingsTx(tx, user.companyId);
 
     const newReceipt = await tx.receipt.create({

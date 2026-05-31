@@ -34,6 +34,8 @@ type ReceiptFormProps = {
   };
   invoice: {
     invoiceNumber: string;
+    total: string;
+    refundableDeposit: string;
     items: Array<{
       description: string;
       lineTotal: string;
@@ -289,8 +291,9 @@ export function ReceiptForm({
                     paidAmount={amount}
                     paymentInfo={company.paymentInfo}
                     previewMode
+                    refundableDeposit={invoice.refundableDeposit}
                     remarks={notes}
-                    total={amount}
+                    total={invoice.total}
                   />
                 ) : (
                   <ClassicDocumentPreview
@@ -309,8 +312,9 @@ export function ReceiptForm({
                     paidAmount={amount}
                     paymentInfo={company.paymentInfo}
                     previewMode
+                    refundableDeposit={invoice.refundableDeposit}
                     remarks={notes}
-                    total={amount}
+                    total={invoice.total}
                   />
                 )}
               </div>
