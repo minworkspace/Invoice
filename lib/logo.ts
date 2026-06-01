@@ -9,17 +9,13 @@ import { deleteFile, getLocalFilePath, saveFile } from "@/lib/storage";
 const ALLOWED_IMAGE_TYPES = new Set([
   "image/png",
   "image/jpeg",
-  "image/jpg",
-  "image/webp",
-  "image/svg+xml"
+  "image/jpg"
 ]);
 
 const EXTENSION_BY_TYPE: Record<string, string> = {
   "image/png": "png",
   "image/jpeg": "jpg",
-  "image/jpg": "jpg",
-  "image/webp": "webp",
-  "image/svg+xml": "svg"
+  "image/jpg": "jpg"
 };
 
 const ASSET_KINDS = new Set(["logos", "chops"]);
@@ -27,25 +23,6 @@ const PDF_EMBEDDABLE_EXTENSIONS = new Set([".png", ".jpg", ".jpeg"]);
 
 function companyAssetKey(companyId: string, kind: "logos" | "chops", extension: string) {
   return `uploads/company-${companyId}/${kind}/${kind.slice(0, -1)}-${randomUUID()}.${extension}`;
-}
-
-function sanitizeSvg(svg: string) {
-  const lower = svg.toLowerCase();
-  const blocked = [
-    "<script",
-    "javascript:",
-    "<foreignobject",
-    "onload=",
-    "onclick=",
-    "onerror=",
-    "data:text/html"
-  ];
-
-  if (!lower.includes("<svg") || blocked.some((needle) => lower.includes(needle))) {
-    throw new Error("SVG contains unsupported or unsafe content.");
-  }
-
-  return svg;
 }
 
 function assertManagedAssetKey(assetUrl?: string | null) {
@@ -66,7 +43,7 @@ function assertManagedAssetKey(assetUrl?: string | null) {
 
 function assertValidUpload(file: File) {
   if (!ALLOWED_IMAGE_TYPES.has(file.type)) {
-    throw new Error("Image must be a PNG, JPG, JPEG, WebP, or safe SVG file.");
+    throw new Error("Image must be a PNG, JPG, or JPEG file.");
   }
 
   if (file.size > MAX_LOGO_SIZE) {
@@ -77,25 +54,9 @@ function assertValidUpload(file: File) {
 function assertValidImageBytes(type: string, bytes: Buffer) {
   const isPng = bytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
   const isJpeg = bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
-  const isWebp = bytes.subarray(0, 4).toString("ascii") === "RIFF" && bytes.subarray(8, 12).toString("ascii") === "WEBP";
 
   if (type === "image/png" && !isPng) throw new Error("PNG upload content does not match its file type.");
   if ((type === "image/jpeg" || type === "image/jpg") && !isJpeg) throw new Error("JPEG upload content does not match its file type.");
-  if (type === "image/webp" && !isWebp) throw new Error("WebP upload content does not match its file type.");
-}
-
-async function optionalSharpConvertToPng(bytes: Buffer): Promise<Buffer | null> {
-  try {
-    const load = new Function("specifier", "return import(specifier)") as (specifier: string) => Promise<unknown>;
-    const sharpModule = (await load("sharp")) as { default?: unknown };
-    const sharp = (sharpModule.default || sharpModule) as (input: Buffer) => {
-      png: () => { toBuffer: () => Promise<Buffer> };
-    };
-
-    return sharp(bytes).png().toBuffer();
-  } catch {
-    return null;
-  }
 }
 
 export function companyAssetPublicUrlToAbsolutePath(assetUrl?: string | null) {
@@ -138,24 +99,12 @@ async function saveCompanyAsset(companyId: string, file: File, kind: "logos" | "
 
   const bytes = Buffer.from(await file.arrayBuffer());
   assertValidImageBytes(file.type, bytes);
-  let extension = EXTENSION_BY_TYPE[file.type] || "png";
-  let data: Buffer = file.type === "image/svg+xml" ? Buffer.from(sanitizeSvg(bytes.toString("utf8"))) : bytes;
-  let contentType = file.type;
-
-  if (!["image/png", "image/jpeg", "image/jpg"].includes(file.type)) {
-    const converted = await optionalSharpConvertToPng(data);
-    if (!converted) {
-      throw new Error("This image format can preview in the browser but cannot be embedded in PDFs here. Please upload PNG or JPG.");
-    }
-
-    data = converted;
-    extension = "png";
-    contentType = "image/png";
-  }
+  const extension = EXTENSION_BY_TYPE[file.type] || "png";
+  const contentType = file.type;
 
   const stored = await saveFile({
     key: companyAssetKey(companyId, kind, extension),
-    data,
+    data: bytes,
     contentType,
     visibility: "public"
   });

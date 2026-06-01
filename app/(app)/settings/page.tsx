@@ -1,165 +1,10 @@
-import { redirect } from "next/navigation";
 import { documentTemplateOptions, normalizeDocumentTemplateKey } from "@/components/document-templates/template-registry";
 import { CompanyImageField } from "@/components/CompanyImageField";
 import { PageHeader } from "@/components/PageHeader";
 import { requireCompanyUser } from "@/lib/auth";
 import { ensureCompanySettings } from "@/lib/company-settings";
-import { formString, nullableString } from "@/lib/forms";
-import { companyAssetStatus, deleteManagedAssetFile, saveCompanyChop, saveCompanyLogo } from "@/lib/logo";
+import { companyAssetStatus } from "@/lib/logo";
 import { versionedLogoUrl } from "@/lib/logo-shared";
-import { prisma } from "@/lib/prisma";
-
-async function updateSettingsAction(formData: FormData) {
-  "use server";
-  const user = await requireCompanyUser();
-  const nextCompanyName = formString(formData, "companyName");
-  const nextCompanyEmail = nullableString(formData, "companyEmail");
-  const nextCompanyPhone = nullableString(formData, "companyPhone");
-  const nextCompanyAddress = nullableString(formData, "companyAddress");
-  const nextSsmNumber = nullableString(formData, "ssmNumber");
-  const nextInvoicePrefix = formString(formData, "invoicePrefix", "INV-");
-  const nextInvoiceStartNumber = Number(formString(formData, "invoiceStartNumber", "1"));
-  const nextQuotationPrefix = formString(formData, "quotationPrefix", "QUO-");
-  const nextQuotationStartNumber = Number(formString(formData, "quotationStartNumber", "1"));
-  const nextReceiptPrefix = formString(formData, "receiptPrefix", "REC-");
-  const nextReceiptStartNumber = Number(formString(formData, "receiptStartNumber", "1"));
-  const nextNumberPadding = Number(formString(formData, "documentNumberPadding", "5"));
-  const nextPaymentInfo = nullableString(formData, "paymentInfo");
-  const nextDefaultImportantNotes = nullableString(formData, "defaultImportantNotes");
-  const nextDefaultRemarks = nullableString(formData, "defaultRemarks");
-  const nextDefaultInvoiceTemplate = normalizeDocumentTemplateKey(formData.get("defaultInvoiceTemplate"));
-  const nextDefaultQuotationTemplate = normalizeDocumentTemplateKey(formData.get("defaultQuotationTemplate"));
-  const nextDefaultReceiptTemplate = normalizeDocumentTemplateKey(formData.get("defaultReceiptTemplate"));
-  const currentSettings = await prisma.companySettings.findUnique({
-    where: { companyId: user.companyId }
-  });
-  const uploadedLogo = formData.get("logo");
-  const uploadedChop = formData.get("chop");
-  const removeLogo = formData.get("removeLogo") === "1";
-  const removeChop = formData.get("removeChop") === "1";
-  let nextLogoUrl = currentSettings?.logoUrl ?? null;
-  let nextChopUrl = currentSettings?.chopUrl ?? null;
-  const filesToDeleteAfterSave: Array<string | null | undefined> = [];
-  const newFilesToRollback: Array<string | null | undefined> = [];
-
-  try {
-    if (uploadedLogo instanceof File && uploadedLogo.size > 0) {
-      const savedLogoUrl = await saveCompanyLogo(user.companyId, uploadedLogo);
-      if (savedLogoUrl) {
-        newFilesToRollback.push(savedLogoUrl);
-        filesToDeleteAfterSave.push(currentSettings?.logoUrl);
-        nextLogoUrl = savedLogoUrl;
-      }
-    } else if (removeLogo && currentSettings?.logoUrl) {
-      filesToDeleteAfterSave.push(currentSettings.logoUrl);
-      nextLogoUrl = null;
-    }
-
-    if (uploadedChop instanceof File && uploadedChop.size > 0) {
-      const savedChopUrl = await saveCompanyChop(user.companyId, uploadedChop);
-      if (savedChopUrl) {
-        newFilesToRollback.push(savedChopUrl);
-        filesToDeleteAfterSave.push(currentSettings?.chopUrl);
-        nextChopUrl = savedChopUrl;
-      }
-    } else if (removeChop && currentSettings?.chopUrl) {
-      filesToDeleteAfterSave.push(currentSettings.chopUrl);
-      nextChopUrl = null;
-    }
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Logo upload failed.";
-    redirect(`/settings?error=${encodeURIComponent(message)}`);
-  }
-
-  try {
-    await prisma.company.update({
-      where: { id: user.companyId },
-      data: {
-        name: nextCompanyName,
-        email: nextCompanyEmail,
-        phone: nextCompanyPhone,
-        address: nextCompanyAddress,
-        settings: {
-          upsert: {
-            create: {
-              logoUrl: nextLogoUrl,
-              chopUrl: nextChopUrl,
-              ssmNumber: nextSsmNumber,
-              invoicePrefix: nextInvoicePrefix,
-              invoiceStartNumber: nextInvoiceStartNumber,
-              quotationPrefix: nextQuotationPrefix,
-              quotationStartNumber: nextQuotationStartNumber,
-              receiptPrefix: nextReceiptPrefix,
-              receiptStartNumber: nextReceiptStartNumber,
-              documentNumberPadding: nextNumberPadding,
-              paymentInfo: nextPaymentInfo,
-              defaultImportantNotes: nextDefaultImportantNotes,
-              defaultRemarks: nextDefaultRemarks,
-              defaultInvoiceTemplate: nextDefaultInvoiceTemplate,
-              defaultQuotationTemplate: nextDefaultQuotationTemplate,
-              defaultReceiptTemplate: nextDefaultReceiptTemplate
-            },
-            update: {
-              logoUrl: nextLogoUrl,
-              chopUrl: nextChopUrl,
-              ssmNumber: nextSsmNumber,
-              invoicePrefix: nextInvoicePrefix,
-              invoiceStartNumber: nextInvoiceStartNumber,
-              quotationPrefix: nextQuotationPrefix,
-              quotationStartNumber: nextQuotationStartNumber,
-              receiptPrefix: nextReceiptPrefix,
-              receiptStartNumber: nextReceiptStartNumber,
-              documentNumberPadding: nextNumberPadding,
-              paymentInfo: nextPaymentInfo,
-              defaultImportantNotes: nextDefaultImportantNotes,
-              defaultRemarks: nextDefaultRemarks,
-              defaultInvoiceTemplate: nextDefaultInvoiceTemplate,
-              defaultQuotationTemplate: nextDefaultQuotationTemplate,
-              defaultReceiptTemplate: nextDefaultReceiptTemplate
-            }
-          }
-        }
-      }
-    });
-  } catch (error) {
-    await Promise.all(newFilesToRollback.map((file) => deleteManagedAssetFile(file)));
-    throw error;
-  }
-
-  await Promise.all(
-    filesToDeleteAfterSave
-      .filter((file) => file && file !== nextLogoUrl && file !== nextChopUrl)
-      .map((file) => deleteManagedAssetFile(file))
-  );
-
-  const companyHeaderChanged =
-    nextCompanyName !== user.company.name ||
-    nextCompanyEmail !== (user.company.email ?? null) ||
-    nextCompanyPhone !== (user.company.phone ?? null) ||
-    nextCompanyAddress !== (user.company.address ?? null) ||
-    nextLogoUrl !== currentSettings?.logoUrl ||
-    nextChopUrl !== currentSettings?.chopUrl ||
-    nextSsmNumber !== (currentSettings?.ssmNumber ?? null);
-
-  if (companyHeaderChanged) {
-    await prisma.$transaction([
-      prisma.invoice.updateMany({
-        where: { companyId: user.companyId, pdfUrl: { not: null } },
-        data: { pdfNeedsRegeneration: true }
-      }),
-      prisma.quotation.updateMany({
-        where: { companyId: user.companyId, pdfUrl: { not: null } },
-        data: { pdfNeedsRegeneration: true }
-      }),
-      prisma.receipt.updateMany({
-        where: { companyId: user.companyId, pdfUrl: { not: null } },
-        data: { pdfNeedsRegeneration: true }
-      })
-    ]);
-  }
-
-  redirect("/settings?saved=1");
-}
 
 export default async function SettingsPage({
   searchParams
@@ -197,7 +42,7 @@ export default async function SettingsPage({
           Re-upload it as PNG or JPG, then regenerate affected receipts.
         </div>
       ) : null}
-      <form action={updateSettingsAction} className="space-y-6">
+      <form action="/api/settings" className="space-y-6" encType="multipart/form-data" method="post">
         <section className="panel grid gap-4 lg:grid-cols-2">
           <label>
             <span className="label">Company name</span>
@@ -222,14 +67,14 @@ export default async function SettingsPage({
           <div className="lg:col-span-2">
             <CompanyImageField
               companyName={user.company.name}
-              existingImageUrl={versionedLogoUrl(settings?.logoUrl, settings?.updatedAt)}
+              existingImageUrl={logoStatus.exists ? versionedLogoUrl(settings?.logoUrl, settings?.updatedAt) : ""}
               kind="logo"
             />
           </div>
           <div className="lg:col-span-2">
             <CompanyImageField
               companyName={user.company.name}
-              existingImageUrl={versionedLogoUrl(settings?.chopUrl, settings?.updatedAt)}
+              existingImageUrl={chopStatus.exists ? versionedLogoUrl(settings?.chopUrl, settings?.updatedAt) : ""}
               kind="chop"
             />
           </div>

@@ -9,15 +9,15 @@ export function chopHelperText() {
 }
 
 export function logoAcceptValue() {
-  return ".png,.jpg,.jpeg,.webp,.svg,image/png,image/jpeg,image/webp,image/svg+xml";
+  return ".png,.jpg,.jpeg,image/png,image/jpeg";
 }
 
 export function imageAcceptedFormatsText() {
-  return "Accepted formats: PNG, JPG, JPEG, WebP, SVG. Max file size: 2MB.";
+  return "Accepted formats: PNG, JPG, JPEG. Max file size: 2MB.";
 }
 
 export function pdfCompatibilityText() {
-  return "For reliable PDFs, WebP and SVG uploads are converted to PNG before saving.";
+  return "Use PNG or JPG for reliable PDF previews and downloads.";
 }
 
 export function versionedLogoUrl(logoUrl?: string | null, updatedAt?: Date | string | null) {
