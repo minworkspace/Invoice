@@ -9,6 +9,7 @@ import { StatusPill } from "@/components/StatusPill";
 import { WhatsAppButton } from "@/components/WhatsAppButton";
 import { money, shortDate } from "@/lib/format";
 import { requireCompanyUser } from "@/lib/auth";
+import { invoiceGrandTotal, invoiceOutstandingBalance, invoiceRecordedPaid } from "@/lib/invoice-amounts";
 import { prisma } from "@/lib/prisma";
 
 export default async function InvoiceDetailPage({
@@ -34,6 +35,9 @@ export default async function InvoiceDetailPage({
   if (!invoice) notFound();
 
   const linkPath = invoice.pdfUrl || `/invoices/${invoice.id}`;
+  const grandTotal = invoiceGrandTotal(invoice);
+  const recordedPaid = invoiceRecordedPaid(invoice);
+  const outstandingBalance = invoiceOutstandingBalance(invoice);
 
   return (
     <>
@@ -62,7 +66,7 @@ export default async function InvoiceDetailPage({
               documentType="INVOICE"
               documentId={invoice.id}
               documentNumber={invoice.invoiceNumber}
-              amount={money(invoice.total)}
+              amount={money(grandTotal)}
               defaultPhone={invoice.customer.whatsapp}
               linkPath={linkPath}
             />
@@ -159,9 +163,10 @@ export default async function InvoiceDetailPage({
           <DetailRow label="Due date" value={shortDate(invoice.dueDate)} />
           <DetailRow label="Quotation" value={invoice.quotation?.quotationNumber || "-"} />
           <DetailRow label="Subtotal" value={money(invoice.subtotal)} />
-          <DetailRow label="Total" value={money(invoice.total)} strong />
-          <DetailRow label="Paid amount" value={money(invoice.paidAmount)} />
           <DetailRow label="Refundable deposit" value={money(invoice.refundableDeposit)} />
+          <DetailRow label="Total" value={money(grandTotal)} strong />
+          <DetailRow label="Paid amount" value={money(recordedPaid)} />
+          <DetailRow label="Outstanding" value={money(outstandingBalance)} />
           <DetailRow label="PDF generated" value={shortDate(invoice.pdfGeneratedAt)} />
         </aside>
       </section>

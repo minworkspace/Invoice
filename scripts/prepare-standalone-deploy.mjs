@@ -100,6 +100,58 @@ async function removeEnvFiles() {
   }
 }
 
+async function rewriteStandalonePackageJson() {
+  const packagePath = path.join(standaloneDir, "package.json");
+
+  if (!(await pathExists(packagePath))) return;
+
+  const packageJson = JSON.parse(await fs.readFile(packagePath, "utf8"));
+  packageJson.scripts = {
+    ...(packageJson.scripts || {}),
+    start: "node server.js",
+    prisma: "prisma",
+    "prisma:generate": "prisma generate",
+    "migrate:deploy": "prisma migrate deploy"
+  };
+
+  await fs.writeFile(packagePath, `${JSON.stringify(packageJson, null, 2)}\n`);
+}
+
+async function patchStandaloneServerRuntimeCheck() {
+  const serverPath = path.join(standaloneDir, "server.js");
+
+  if (!(await pathExists(serverPath))) return;
+
+  const marker = "Invoice App standalone runtime check";
+  const source = await fs.readFile(serverPath, "utf8");
+  if (source.includes(marker)) return;
+
+  const runtimeCheck = `// ${marker}
+const invoiceAppMinimumNode = { major: 20, minor: 11, patch: 0 };
+const invoiceAppNodeParts = process.versions.node.split(".").map((part) => Number.parseInt(part, 10));
+const invoiceAppNodeMajor = invoiceAppNodeParts[0] || 0;
+const invoiceAppNodeMinor = invoiceAppNodeParts[1] || 0;
+const invoiceAppNodePatch = invoiceAppNodeParts[2] || 0;
+const invoiceAppNodeSupported =
+  invoiceAppNodeMajor > invoiceAppMinimumNode.major ||
+  (invoiceAppNodeMajor === invoiceAppMinimumNode.major &&
+    (invoiceAppNodeMinor > invoiceAppMinimumNode.minor ||
+      (invoiceAppNodeMinor === invoiceAppMinimumNode.minor && invoiceAppNodePatch >= invoiceAppMinimumNode.patch)));
+
+if (!invoiceAppNodeSupported) {
+  console.error(
+    "Invoice App requires Node.js >= 20.11.0. Current runtime is " +
+      process.versions.node +
+      ". In Hostinger, set the Node.js app/runtime version to Node 20 LTS or newer, then rebuild/restart the app."
+  );
+  process.exit(1);
+}
+
+`;
+
+  await fs.writeFile(serverPath, `${runtimeCheck}${source}`);
+}
+
 async function main() {
   if (!(await pathExists(standaloneDir))) {
     throw new Error("Standalone build output not found. Run next build first.");
@@ -111,6 +163,8 @@ async function main() {
   await copyPdfKitFontData();
   await resetPublicRuntimeFolders();
   await removeEnvFiles();
+  await rewriteStandalonePackageJson();
+  await patchStandaloneServerRuntimeCheck();
   await ensureDir(path.join(standaloneDir, "tmp"));
 }
 

@@ -6,7 +6,7 @@ import { hashPassword, requireSuperAdmin } from "@/lib/auth";
 import { defaultCompanySettingsData } from "@/lib/company-settings";
 import { formString } from "@/lib/forms";
 import { prisma } from "@/lib/prisma";
-import { deleteFile } from "@/lib/storage";
+import { deleteFile, deleteFolder } from "@/lib/storage";
 
 function isUniqueConstraintError(error: unknown) {
   return Boolean(
@@ -221,6 +221,7 @@ export async function deleteCompanyAction(formData: FormData) {
   }
 
   await Promise.all(filesToDelete.map((file) => deleteFile(file)));
+  await deleteFolder(`uploads/company-${companyId}`);
 
   revalidatePath("/admin");
   revalidatePath("/admin/companies");

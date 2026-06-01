@@ -12,6 +12,14 @@ export function logoAcceptValue() {
   return ".png,.jpg,.jpeg,.webp,.svg,image/png,image/jpeg,image/webp,image/svg+xml";
 }
 
+export function imageAcceptedFormatsText() {
+  return "Accepted formats: PNG, JPG, JPEG, WebP, SVG. Max file size: 2MB.";
+}
+
+export function pdfCompatibilityText() {
+  return "For reliable PDFs, WebP and SVG uploads are converted to PNG before saving.";
+}
+
 export function versionedLogoUrl(logoUrl?: string | null, updatedAt?: Date | string | null) {
   if (!logoUrl) return "";
   if (!updatedAt) return logoUrl;

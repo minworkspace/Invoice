@@ -11,6 +11,15 @@ const PUBLIC_URL_PREFIX = "/";
 const USAGE_CACHE_TTL_MS = 60_000;
 const usageCache = new Map<string, { expiresAt: number; usage: StorageUsage }>();
 
+function logStorageWarning(message: string, details: Record<string, unknown>) {
+  console.warn(
+    message,
+    Object.fromEntries(
+      Object.entries(details).filter(([, value]) => value !== undefined && value !== null && value !== "")
+    )
+  );
+}
+
 function normalizeKey(keyOrUrl?: string | null) {
   if (!keyOrUrl) return null;
   const withoutQuery = keyOrUrl.split("?")[0] || "";
@@ -68,6 +77,25 @@ export class LocalStorageProvider implements StorageProvider {
     return absolutePath;
   }
 
+  private async removeEmptyAncestors(startDir: string) {
+    const stopDirs = new Set([
+      PUBLIC_ROOT,
+      path.join(PUBLIC_ROOT, "uploads"),
+      path.join(PUBLIC_ROOT, "generated-pdfs")
+    ]);
+    let current = startDir;
+
+    while (current.startsWith(PUBLIC_ROOT) && !stopDirs.has(current)) {
+      try {
+        await fs.rmdir(current);
+      } catch {
+        return;
+      }
+
+      current = path.dirname(current);
+    }
+  }
+
   async saveFile(input: SaveFileInput) {
     if (!input?.key || typeof input.key !== "string") {
       throw new TypeError("Storage save failed: key must be a non-empty string.");
@@ -103,11 +131,37 @@ export class LocalStorageProvider implements StorageProvider {
     const absolutePath = this.absolutePathFor(keyOrUrl);
     if (!absolutePath) return;
 
+    usageCache.clear();
+
     try {
       await fs.unlink(absolutePath);
-      usageCache.clear();
+      await this.removeEmptyAncestors(path.dirname(absolutePath));
     } catch {
-      // Missing files should not break document or settings updates.
+      try {
+        await fs.access(absolutePath);
+        logStorageWarning("Storage file deletion failed.", {
+          key: normalizeKey(keyOrUrl),
+          fileName: path.basename(absolutePath)
+        });
+      } catch {
+        // Missing files should not break document, company, or settings updates.
+      }
+    }
+  }
+
+  async deletePrefix(prefix?: string | null) {
+    const absolutePath = this.absolutePathFor(prefix);
+    if (!absolutePath) return;
+
+    try {
+      await fs.rm(absolutePath, { recursive: true, force: true });
+      usageCache.clear();
+      await this.removeEmptyAncestors(path.dirname(absolutePath));
+    } catch {
+      logStorageWarning("Storage folder deletion failed.", {
+        key: normalizeKey(prefix),
+        folderName: path.basename(absolutePath)
+      });
     }
   }
 

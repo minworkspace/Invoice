@@ -17,6 +17,10 @@ export async function deleteFile(keyOrUrl?: string | null) {
   await provider.deleteFile(keyOrUrl);
 }
 
+export async function deleteFolder(prefix?: string | null) {
+  await provider.deletePrefix?.(prefix);
+}
+
 export function getFileUrl(keyOrUrl?: string | null) {
   return provider.getFileUrl(keyOrUrl);
 }

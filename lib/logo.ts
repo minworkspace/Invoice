@@ -1,6 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
+import fsSync from "fs";
 import path from "path";
 import { MAX_LOGO_SIZE } from "@/lib/logo-shared";
 import { deleteFile, getLocalFilePath, saveFile } from "@/lib/storage";
@@ -22,6 +23,7 @@ const EXTENSION_BY_TYPE: Record<string, string> = {
 };
 
 const ASSET_KINDS = new Set(["logos", "chops"]);
+const PDF_EMBEDDABLE_EXTENSIONS = new Set([".png", ".jpg", ".jpeg"]);
 
 function companyAssetKey(companyId: string, kind: "logos" | "chops", extension: string) {
   return `uploads/company-${companyId}/${kind}/${kind.slice(0, -1)}-${randomUUID()}.${extension}`;
@@ -82,6 +84,20 @@ function assertValidImageBytes(type: string, bytes: Buffer) {
   if (type === "image/webp" && !isWebp) throw new Error("WebP upload content does not match its file type.");
 }
 
+async function optionalSharpConvertToPng(bytes: Buffer): Promise<Buffer | null> {
+  try {
+    const load = new Function("specifier", "return import(specifier)") as (specifier: string) => Promise<unknown>;
+    const sharpModule = (await load("sharp")) as { default?: unknown };
+    const sharp = (sharpModule.default || sharpModule) as (input: Buffer) => {
+      png: () => { toBuffer: () => Promise<Buffer> };
+    };
+
+    return sharp(bytes).png().toBuffer();
+  } catch {
+    return null;
+  }
+}
+
 export function companyAssetPublicUrlToAbsolutePath(assetUrl?: string | null) {
   const key = assertManagedAssetKey(assetUrl);
   return key ? getLocalFilePath(key) : null;
@@ -94,7 +110,20 @@ export function logoPublicUrlToAbsolutePath(logoUrl?: string | null) {
 export function isPdfEmbeddableImage(assetUrl?: string | null) {
   const key = assertManagedAssetKey(assetUrl);
   if (!key) return false;
-  return [".png", ".jpg", ".jpeg"].includes(path.extname(key).toLowerCase());
+  return PDF_EMBEDDABLE_EXTENSIONS.has(path.extname(key).toLowerCase());
+}
+
+export function companyAssetStatus(assetUrl?: string | null) {
+  const key = assertManagedAssetKey(assetUrl);
+  const filePath = key ? getLocalFilePath(key) : null;
+  const extension = key ? path.extname(key).toLowerCase() : "";
+
+  return {
+    key,
+    extension,
+    exists: Boolean(filePath && fsSync.existsSync(filePath)),
+    pdfEmbeddable: Boolean(key && PDF_EMBEDDABLE_EXTENSIONS.has(extension))
+  };
 }
 
 export async function deleteManagedAssetFile(assetUrl?: string | null) {
@@ -107,14 +136,27 @@ async function saveCompanyAsset(companyId: string, file: File, kind: "logos" | "
 
   assertValidUpload(file);
 
-  const extension = EXTENSION_BY_TYPE[file.type] || "png";
   const bytes = Buffer.from(await file.arrayBuffer());
   assertValidImageBytes(file.type, bytes);
-  const data = file.type === "image/svg+xml" ? Buffer.from(sanitizeSvg(bytes.toString("utf8"))) : bytes;
+  let extension = EXTENSION_BY_TYPE[file.type] || "png";
+  let data: Buffer = file.type === "image/svg+xml" ? Buffer.from(sanitizeSvg(bytes.toString("utf8"))) : bytes;
+  let contentType = file.type;
+
+  if (!["image/png", "image/jpeg", "image/jpg"].includes(file.type)) {
+    const converted = await optionalSharpConvertToPng(data);
+    if (!converted) {
+      throw new Error("This image format can preview in the browser but cannot be embedded in PDFs here. Please upload PNG or JPG.");
+    }
+
+    data = converted;
+    extension = "png";
+    contentType = "image/png";
+  }
+
   const stored = await saveFile({
     key: companyAssetKey(companyId, kind, extension),
     data,
-    contentType: file.type,
+    contentType,
     visibility: "public"
   });
 

@@ -8,8 +8,8 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "node scripts/print-database-target.mjs && prisma generate && prisma migrate deploy && next build && node scripts/prepare-standalone-deploy.mjs",
-    "start": "node .next/standalone/server.js",
+    "build": "node scripts/check-node-version.mjs && node scripts/print-database-target.mjs && prisma generate && prisma migrate deploy && next build && node scripts/prepare-standalone-deploy.mjs",
+    "start": "node scripts/check-node-version.mjs && node .next/standalone/server.js",
     "typecheck": "tsc --noEmit",
     "prisma": "prisma",
     "prisma:generate": "prisma generate",

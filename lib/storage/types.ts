@@ -23,6 +23,7 @@ export type StorageUsage = {
 export type StorageProvider = {
   saveFile(input: SaveFileInput): Promise<StoredFile>;
   deleteFile(keyOrUrl?: string | null): Promise<void>;
+  deletePrefix?(prefix?: string | null): Promise<void>;
   getFileUrl(keyOrUrl?: string | null): string | null;
   getStorageUsage(prefix?: string): Promise<StorageUsage>;
   getLocalPath?(keyOrUrl?: string | null): string | null;

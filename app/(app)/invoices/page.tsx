@@ -6,6 +6,7 @@ import { StatusPill } from "@/components/StatusPill";
 import { money, shortDate } from "@/lib/format";
 import { requireCompanyUser } from "@/lib/auth";
 import { pageCount, pageNumber, pagination } from "@/lib/admin-utils";
+import { invoiceGrandTotal, invoiceRecordedPaid } from "@/lib/invoice-amounts";
 import { prisma } from "@/lib/prisma";
 
 export default async function InvoicesPage({
@@ -57,10 +58,11 @@ export default async function InvoicesPage({
         invoiceNumber: true,
         issueDate: true,
         total: true,
+        refundableDeposit: true,
         paidAmount: true,
         status: true,
         customer: { select: { name: true } },
-        receipt: { select: { receiptNumber: true } }
+        receipt: { select: { receiptNumber: true, amount: true, status: true } }
       },
       orderBy: { issueDate: "desc" }
     })
@@ -124,8 +126,8 @@ export default async function InvoicesPage({
                 <td className="table-cell font-semibold">{invoice.invoiceNumber}</td>
                 <td className="table-cell">{invoice.customer.name}</td>
                 <td className="table-cell">{shortDate(invoice.issueDate)}</td>
-                <td className="table-cell">{money(invoice.total)}</td>
-                <td className="table-cell">{money(invoice.paidAmount)}</td>
+                <td className="table-cell">{money(invoiceGrandTotal(invoice))}</td>
+                <td className="table-cell">{money(invoiceRecordedPaid(invoice))}</td>
                 <td className="table-cell">
                   <StatusPill status={invoice.status} />
                 </td>

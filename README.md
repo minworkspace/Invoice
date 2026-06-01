@@ -227,8 +227,9 @@ Company assets are stored as file paths/URLs only. MySQL does not store base64 i
 ## Hostinger Node.js Notes
 
 - Use Node.js 20 LTS or newer if your Hostinger plan offers it. The app declares `node >=20.11.0` in `package.json`.
+- `.nvmrc` and `.node-version` are included with `20.11.0` so hosts that read version files pick a compatible runtime.
 - Confirm that your exact Hostinger product has Node.js app support. Hostinger's public support docs route Node.js apps to VPS/CloudPanel-style hosting when standard Web/Cloud hosting does not provide root access.
-- This app uses `output: "standalone"` in `next.config.ts`; `yarn start` runs the generated standalone server with `node .next/standalone/server.js`.
+- This app uses `output: "standalone"` in `next.config.ts`. From the source repo root, `yarn start` runs `node .next/standalone/server.js`. Inside the generated `.next/standalone` deploy folder, the post-build script rewrites the copied start script to `node server.js`, because that folder already contains `server.js` at its root.
 - It avoids Vercel-only storage and serverless-only assumptions.
 - Set the Hostinger Node.js app startup command to `yarn start`.
 - Set `NEXT_PUBLIC_APP_URL` to your production URL so WhatsApp messages include correct links.
@@ -339,6 +340,22 @@ The post-build deploy prep now makes sure this folder includes:
 - `.next/static`
 
 It also removes copied env files from the standalone output, so `.env` and `.env.example` are not shipped as deployment artifacts.
+
+The `package.json` copied into `.next/standalone` is adjusted for Hostinger's runtime root:
+
+```json
+"start": "node server.js"
+```
+
+If Hostinger runs `yarn start` from the standalone folder, this avoids a startup crash from looking for `.next/standalone/server.js` inside an already-standalone deployment directory.
+
+The generated `server.js` also includes a small runtime Node version check. If Hostinger is using an older runtime, the app logs:
+
+```text
+Invoice App requires Node.js >= 20.11.0.
+```
+
+When that appears, change the Hostinger Node.js runtime/version setting to Node 20 LTS or newer, then rebuild and restart. Next.js 15 relies on modern Web APIs such as `Request`, so older Node runtimes can produce a 503 before the app can render any page.
 
 ### Running Prisma Migrations On Hostinger
 

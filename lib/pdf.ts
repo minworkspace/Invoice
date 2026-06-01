@@ -246,11 +246,55 @@ async function loadPdfImageSource(assetUrl?: string | null): Promise<PdfImageSou
 
   try {
     const filePath = companyAssetPublicUrlToAbsolutePath(assetUrl);
-    if (!filePath || !fs.existsSync(filePath)) return null;
+    if (!filePath) {
+      console.warn(
+        "PDF asset skipped",
+        safeLogContext({
+          reason: "unmanaged-or-invalid-asset-url",
+          assetExtension: path.extname(assetUrl.split("?")[0] || "").toLowerCase() || null,
+          hasAssetUrl: Boolean(assetUrl)
+        })
+      );
+      return null;
+    }
+
+    if (!fs.existsSync(filePath)) {
+      console.warn(
+        "PDF asset skipped",
+        safeLogContext({
+          reason: "asset-file-missing",
+          assetExtension: path.extname(filePath).toLowerCase() || null,
+          fileName: path.basename(filePath)
+        })
+      );
+      return null;
+    }
 
     const extension = path.extname(filePath).toLowerCase();
     if ([".png", ".jpg", ".jpeg"].includes(extension)) return filePath;
-    if (extension === ".webp") return optionalSharpPngBuffer(filePath);
+    if (extension === ".webp" || extension === ".svg") {
+      const converted = await optionalSharpPngBuffer(filePath);
+      if (converted) return converted;
+
+      console.warn(
+        "PDF asset skipped",
+        safeLogContext({
+          reason: "image-conversion-unavailable",
+          assetExtension: extension,
+          fileName: path.basename(filePath)
+        })
+      );
+      return null;
+    }
+
+    console.warn(
+      "PDF asset skipped",
+      safeLogContext({
+        reason: "unsupported-pdf-image-format",
+        assetExtension: extension || null,
+        fileName: path.basename(filePath)
+      })
+    );
 
     return null;
   } catch (error) {

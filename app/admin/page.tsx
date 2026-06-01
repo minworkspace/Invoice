@@ -4,6 +4,7 @@ import { StatusPill } from "@/components/StatusPill";
 import { requireSuperAdmin } from "@/lib/auth";
 import { formatBytes, pdfStorageSummary } from "@/lib/admin-utils";
 import { money, shortDate } from "@/lib/format";
+import { invoiceGrandTotal } from "@/lib/invoice-amounts";
 import { prisma } from "@/lib/prisma";
 
 async function databaseStatus() {
@@ -50,6 +51,7 @@ export default async function AdminOverviewPage() {
         id: true,
         invoiceNumber: true,
         total: true,
+        refundableDeposit: true,
         status: true,
         createdAt: true,
         company: { select: { id: true, name: true } },
@@ -131,7 +133,7 @@ export default async function AdminOverviewPage() {
                       </Link>
                     </td>
                     <td className="table-cell">{invoice.customer.name}</td>
-                    <td className="table-cell">{money(invoice.total)}</td>
+                    <td className="table-cell">{money(invoiceGrandTotal(invoice))}</td>
                     <td className="table-cell">
                       <StatusPill status={invoice.status} />
                     </td>

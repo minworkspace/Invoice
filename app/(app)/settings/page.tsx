@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { requireCompanyUser } from "@/lib/auth";
 import { ensureCompanySettings } from "@/lib/company-settings";
 import { formString, nullableString } from "@/lib/forms";
-import { deleteManagedChopFile, deleteManagedLogoFile, saveCompanyChop, saveCompanyLogo } from "@/lib/logo";
+import { companyAssetStatus, deleteManagedAssetFile, saveCompanyChop, saveCompanyLogo } from "@/lib/logo";
 import { versionedLogoUrl } from "@/lib/logo-shared";
 import { prisma } from "@/lib/prisma";
 
@@ -39,27 +39,31 @@ async function updateSettingsAction(formData: FormData) {
   const removeChop = formData.get("removeChop") === "1";
   let nextLogoUrl = currentSettings?.logoUrl ?? null;
   let nextChopUrl = currentSettings?.chopUrl ?? null;
+  const filesToDeleteAfterSave: Array<string | null | undefined> = [];
+  const newFilesToRollback: Array<string | null | undefined> = [];
 
   try {
     if (uploadedLogo instanceof File && uploadedLogo.size > 0) {
       const savedLogoUrl = await saveCompanyLogo(user.companyId, uploadedLogo);
       if (savedLogoUrl) {
-        await deleteManagedLogoFile(currentSettings?.logoUrl);
+        newFilesToRollback.push(savedLogoUrl);
+        filesToDeleteAfterSave.push(currentSettings?.logoUrl);
         nextLogoUrl = savedLogoUrl;
       }
     } else if (removeLogo && currentSettings?.logoUrl) {
-      await deleteManagedLogoFile(currentSettings.logoUrl);
+      filesToDeleteAfterSave.push(currentSettings.logoUrl);
       nextLogoUrl = null;
     }
 
     if (uploadedChop instanceof File && uploadedChop.size > 0) {
       const savedChopUrl = await saveCompanyChop(user.companyId, uploadedChop);
       if (savedChopUrl) {
-        await deleteManagedChopFile(currentSettings?.chopUrl);
+        newFilesToRollback.push(savedChopUrl);
+        filesToDeleteAfterSave.push(currentSettings?.chopUrl);
         nextChopUrl = savedChopUrl;
       }
     } else if (removeChop && currentSettings?.chopUrl) {
-      await deleteManagedChopFile(currentSettings.chopUrl);
+      filesToDeleteAfterSave.push(currentSettings.chopUrl);
       nextChopUrl = null;
     }
   } catch (error) {
@@ -67,55 +71,66 @@ async function updateSettingsAction(formData: FormData) {
     redirect(`/settings?error=${encodeURIComponent(message)}`);
   }
 
-  await prisma.company.update({
-    where: { id: user.companyId },
-    data: {
-      name: nextCompanyName,
-      email: nextCompanyEmail,
-      phone: nextCompanyPhone,
-      address: nextCompanyAddress,
-      settings: {
-        upsert: {
-          create: {
-            logoUrl: nextLogoUrl,
-            chopUrl: nextChopUrl,
-            ssmNumber: nextSsmNumber,
-            invoicePrefix: nextInvoicePrefix,
-            invoiceStartNumber: nextInvoiceStartNumber,
-            quotationPrefix: nextQuotationPrefix,
-            quotationStartNumber: nextQuotationStartNumber,
-            receiptPrefix: nextReceiptPrefix,
-            receiptStartNumber: nextReceiptStartNumber,
-            documentNumberPadding: nextNumberPadding,
-            paymentInfo: nextPaymentInfo,
-            defaultImportantNotes: nextDefaultImportantNotes,
-            defaultRemarks: nextDefaultRemarks,
-            defaultInvoiceTemplate: nextDefaultInvoiceTemplate,
-            defaultQuotationTemplate: nextDefaultQuotationTemplate,
-            defaultReceiptTemplate: nextDefaultReceiptTemplate
-          },
-          update: {
-            logoUrl: nextLogoUrl,
-            chopUrl: nextChopUrl,
-            ssmNumber: nextSsmNumber,
-            invoicePrefix: nextInvoicePrefix,
-            invoiceStartNumber: nextInvoiceStartNumber,
-            quotationPrefix: nextQuotationPrefix,
-            quotationStartNumber: nextQuotationStartNumber,
-            receiptPrefix: nextReceiptPrefix,
-            receiptStartNumber: nextReceiptStartNumber,
-            documentNumberPadding: nextNumberPadding,
-            paymentInfo: nextPaymentInfo,
-            defaultImportantNotes: nextDefaultImportantNotes,
-            defaultRemarks: nextDefaultRemarks,
-            defaultInvoiceTemplate: nextDefaultInvoiceTemplate,
-            defaultQuotationTemplate: nextDefaultQuotationTemplate,
-            defaultReceiptTemplate: nextDefaultReceiptTemplate
+  try {
+    await prisma.company.update({
+      where: { id: user.companyId },
+      data: {
+        name: nextCompanyName,
+        email: nextCompanyEmail,
+        phone: nextCompanyPhone,
+        address: nextCompanyAddress,
+        settings: {
+          upsert: {
+            create: {
+              logoUrl: nextLogoUrl,
+              chopUrl: nextChopUrl,
+              ssmNumber: nextSsmNumber,
+              invoicePrefix: nextInvoicePrefix,
+              invoiceStartNumber: nextInvoiceStartNumber,
+              quotationPrefix: nextQuotationPrefix,
+              quotationStartNumber: nextQuotationStartNumber,
+              receiptPrefix: nextReceiptPrefix,
+              receiptStartNumber: nextReceiptStartNumber,
+              documentNumberPadding: nextNumberPadding,
+              paymentInfo: nextPaymentInfo,
+              defaultImportantNotes: nextDefaultImportantNotes,
+              defaultRemarks: nextDefaultRemarks,
+              defaultInvoiceTemplate: nextDefaultInvoiceTemplate,
+              defaultQuotationTemplate: nextDefaultQuotationTemplate,
+              defaultReceiptTemplate: nextDefaultReceiptTemplate
+            },
+            update: {
+              logoUrl: nextLogoUrl,
+              chopUrl: nextChopUrl,
+              ssmNumber: nextSsmNumber,
+              invoicePrefix: nextInvoicePrefix,
+              invoiceStartNumber: nextInvoiceStartNumber,
+              quotationPrefix: nextQuotationPrefix,
+              quotationStartNumber: nextQuotationStartNumber,
+              receiptPrefix: nextReceiptPrefix,
+              receiptStartNumber: nextReceiptStartNumber,
+              documentNumberPadding: nextNumberPadding,
+              paymentInfo: nextPaymentInfo,
+              defaultImportantNotes: nextDefaultImportantNotes,
+              defaultRemarks: nextDefaultRemarks,
+              defaultInvoiceTemplate: nextDefaultInvoiceTemplate,
+              defaultQuotationTemplate: nextDefaultQuotationTemplate,
+              defaultReceiptTemplate: nextDefaultReceiptTemplate
+            }
           }
         }
       }
-    }
-  });
+    });
+  } catch (error) {
+    await Promise.all(newFilesToRollback.map((file) => deleteManagedAssetFile(file)));
+    throw error;
+  }
+
+  await Promise.all(
+    filesToDeleteAfterSave
+      .filter((file) => file && file !== nextLogoUrl && file !== nextChopUrl)
+      .map((file) => deleteManagedAssetFile(file))
+  );
 
   const companyHeaderChanged =
     nextCompanyName !== user.company.name ||
@@ -154,6 +169,8 @@ export default async function SettingsPage({
   const user = await requireCompanyUser();
   const params = await searchParams;
   const settings = await ensureCompanySettings(user.companyId);
+  const logoStatus = companyAssetStatus(settings?.logoUrl);
+  const chopStatus = companyAssetStatus(settings?.chopUrl);
 
   return (
     <>
@@ -166,6 +183,18 @@ export default async function SettingsPage({
       {params?.error ? (
         <div className="mb-4 rounded-md border border-[#B64545]/30 bg-[#FDECEC] px-3 py-2 text-sm text-[#9D3838]">
           {params.error}
+        </div>
+      ) : null}
+      {settings?.logoUrl && (!logoStatus.exists || !logoStatus.pdfEmbeddable) ? (
+        <div className="mb-4 rounded-md border border-[#CFAE43]/30 bg-[#FFF8DF] px-3 py-2 text-sm text-[#765B00]">
+          This logo may not appear in generated PDFs because the file is {logoStatus.exists ? "not PDF-compatible" : "missing from storage"}.
+          Re-upload the logo as PNG or JPG, then regenerate affected PDFs.
+        </div>
+      ) : null}
+      {settings?.chopUrl && (!chopStatus.exists || !chopStatus.pdfEmbeddable) ? (
+        <div className="mb-4 rounded-md border border-[#CFAE43]/30 bg-[#FFF8DF] px-3 py-2 text-sm text-[#765B00]">
+          This chop/stamp may not appear in generated PDFs because the file is {chopStatus.exists ? "not PDF-compatible" : "missing from storage"}.
+          Re-upload it as PNG or JPG, then regenerate affected receipts.
         </div>
       ) : null}
       <form action={updateSettingsAction} className="space-y-6">

@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { StatusPill } from "@/components/StatusPill";
 import { money, shortDate } from "@/lib/format";
 import { requireCompanyUser } from "@/lib/auth";
+import { invoiceGrandTotal, invoiceOutstandingBalance, invoiceRecordedPaid } from "@/lib/invoice-amounts";
 import { prisma } from "@/lib/prisma";
 
 export default async function DashboardPage() {
@@ -13,21 +14,59 @@ export default async function DashboardPage() {
   startOfMonth.setDate(1);
   startOfMonth.setHours(0, 0, 0, 0);
 
-  const [invoiceCount, paidAggregate, totalAggregate, recentInvoices, recentQuotations, recentReceipts] =
+  const [
+    invoiceCount,
+    paidReceiptAggregate,
+    manuallyPaidInvoices,
+    activeInvoices,
+    recentInvoices,
+    recentQuotations,
+    recentReceipts
+  ] =
     await Promise.all([
       prisma.invoice.count({
         where: { companyId: user.companyId, issueDate: { gte: startOfMonth } }
       }),
-      prisma.invoice.aggregate({
-        where: { companyId: user.companyId, issueDate: { gte: startOfMonth } },
-        _sum: { paidAmount: true }
+      prisma.receipt.aggregate({
+        where: {
+          companyId: user.companyId,
+          status: DocumentStatus.PAID,
+          receiptDate: { gte: startOfMonth }
+        },
+        _sum: { amount: true }
       }),
-      prisma.invoice.aggregate({
+      prisma.invoice.findMany({
+        where: {
+          companyId: user.companyId,
+          status: { not: DocumentStatus.CANCELLED },
+          issueDate: { gte: startOfMonth },
+          receipt: { is: null },
+          OR: [{ paidAmount: { gt: 0 } }, { status: DocumentStatus.PAID }]
+        },
+        select: {
+          total: true,
+          refundableDeposit: true,
+          paidAmount: true,
+          status: true
+        }
+      }),
+      prisma.invoice.findMany({
         where: {
           companyId: user.companyId,
           status: { not: DocumentStatus.CANCELLED }
         },
-        _sum: { total: true, paidAmount: true }
+        select: {
+          total: true,
+          refundableDeposit: true,
+          paidAmount: true,
+          status: true,
+          receipt: {
+            select: {
+              amount: true,
+              status: true
+            }
+          }
+        }
       }),
       prisma.invoice.findMany({
         where: { companyId: user.companyId },
@@ -49,7 +88,10 @@ export default async function DashboardPage() {
       })
     ]);
 
-  const outstanding = Number(totalAggregate._sum.total || 0) - Number(totalAggregate._sum.paidAmount || 0);
+  const outstanding = activeInvoices.reduce((sum, invoice) => sum + invoiceOutstandingBalance(invoice), 0);
+  const paidThisMonth =
+    Number(paidReceiptAggregate._sum.amount || 0) +
+    manuallyPaidInvoices.reduce((sum, invoice) => sum + invoiceRecordedPaid(invoice), 0);
 
   return (
     <>
@@ -75,7 +117,7 @@ export default async function DashboardPage() {
         </div>
         <div className="panel">
           <p className="text-sm font-semibold text-muted">Paid this month</p>
-          <p className="mt-2 text-3xl font-bold">{money(paidAggregate._sum.paidAmount)}</p>
+          <p className="mt-2 text-3xl font-bold">{money(paidThisMonth)}</p>
         </div>
         <div className="panel">
           <p className="text-sm font-semibold text-muted">Outstanding amount</p>
@@ -95,7 +137,7 @@ export default async function DashboardPage() {
             number: invoice.invoiceNumber,
             customer: invoice.customer.name,
             date: shortDate(invoice.issueDate),
-            total: money(invoice.total),
+            total: money(invoiceGrandTotal(invoice)),
             status: invoice.status,
             title: "Delete invoice?"
           }))}
