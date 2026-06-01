@@ -31,8 +31,6 @@ export default async function ReceiptDetailPage({
 
   if (!receipt) notFound();
 
-  const linkPath = receipt.pdfUrl || `/receipts/${receipt.id}`;
-
   return (
     <>
       <PageHeader
@@ -64,7 +62,6 @@ export default async function ReceiptDetailPage({
               documentNumber={receipt.receiptNumber}
               amount={money(receipt.amount)}
               defaultPhone={receipt.customer.whatsapp}
-              linkPath={linkPath}
             />
             <Link className="btn btn-primary" href={`/invoices/${receipt.invoice.id}`}>
               View invoice

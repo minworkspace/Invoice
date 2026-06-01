@@ -8,7 +8,6 @@ type WhatsAppButtonProps = {
   documentNumber: string;
   amount: string;
   defaultPhone?: string | null;
-  linkPath: string;
 };
 
 function cleanPhone(value: string) {
@@ -20,17 +19,15 @@ export function WhatsAppButton({
   documentId,
   documentNumber,
   amount,
-  defaultPhone,
-  linkPath
+  defaultPhone
 }: WhatsAppButtonProps) {
   const [open, setOpen] = useState(false);
   const [phoneNumber, setPhoneNumber] = useState(defaultPhone || "");
   const [sending, setSending] = useState(false);
 
   const message = useMemo(() => {
-    const url = typeof window === "undefined" ? linkPath : `${window.location.origin}${linkPath}`;
-    return `${documentType} ${documentNumber}\nAmount: ${amount}\nLink: ${url}`;
-  }, [amount, documentNumber, documentType, linkPath]);
+    return `${documentType} ${documentNumber}\nAmount: ${amount}`;
+  }, [amount, documentNumber, documentType]);
 
   async function send() {
     const phone = cleanPhone(phoneNumber);
@@ -70,7 +67,7 @@ export function WhatsAppButton({
                 <h3 className="text-lg font-bold">Send via WhatsApp</h3>
                 <p className="mt-1 text-sm text-muted">{documentNumber}</p>
                 <p className="mt-2 text-sm text-muted">
-                  WhatsApp will open with a message. Please send it manually.
+                  WhatsApp will open with a message. Attach the downloaded PDF manually if needed.
                 </p>
               </div>
               <button className="btn btn-secondary h-9" type="button" onClick={() => setOpen(false)}>

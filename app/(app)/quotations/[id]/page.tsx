@@ -31,8 +31,6 @@ export default async function QuotationDetailPage({
 
   if (!quotation) notFound();
 
-  const linkPath = quotation.pdfUrl || `/quotations/${quotation.id}`;
-
   return (
     <>
       <PageHeader
@@ -64,7 +62,6 @@ export default async function QuotationDetailPage({
               documentNumber={quotation.quotationNumber}
               amount={money(quotation.total)}
               defaultPhone={quotation.customer.whatsapp}
-              linkPath={linkPath}
             />
             {quotation.invoice ? (
               <Link className="btn btn-primary" href={`/invoices/${quotation.invoice.id}`}>

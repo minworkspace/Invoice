@@ -24,6 +24,13 @@ export const CLEAN_LAYOUT = {
     x: 326,
     width: 213
   },
+  billTo: {
+    x: 42,
+    labelY: 143,
+    nameY: 162,
+    detailsY: 182,
+    width: 250
+  },
   table: {
     left: 42,
     right: 553,
@@ -40,20 +47,20 @@ export const CLEAN_LAYOUT = {
     amount: { x: 416, width: 123 }
   },
   summary: {
-    x: 210,
+    x: 310,
     y: 190,
-    width: 343,
+    width: 243,
     height: 30,
-    labelX: 260,
-    labelWidth: 130,
-    amountX: 406,
-    amountWidth: 133
+    labelX: 330,
+    labelWidth: 94,
+    amountX: 433,
+    amountWidth: 106
   },
   date: {
-    labelX: 260,
-    labelWidth: 130,
-    valueX: 406,
-    valueWidth: 133
+    labelX: 330,
+    labelWidth: 94,
+    valueX: 433,
+    valueWidth: 106
   },
   sections: {
     x: 42,

@@ -34,7 +34,6 @@ export default async function InvoiceDetailPage({
 
   if (!invoice) notFound();
 
-  const linkPath = invoice.pdfUrl || `/invoices/${invoice.id}`;
   const grandTotal = invoiceGrandTotal(invoice);
   const recordedPaid = invoiceRecordedPaid(invoice);
   const outstandingBalance = invoiceOutstandingBalance(invoice);
@@ -68,7 +67,6 @@ export default async function InvoiceDetailPage({
               documentNumber={invoice.invoiceNumber}
               amount={money(grandTotal)}
               defaultPhone={invoice.customer.whatsapp}
-              linkPath={linkPath}
             />
             {invoice.receipt ? (
               <Link className="btn btn-primary" href={`/receipts/${invoice.receipt.id}`}>

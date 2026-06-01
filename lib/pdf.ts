@@ -31,6 +31,7 @@ const CLEAN_TABLE = CLEAN_LAYOUT.table;
 const CLEAN_SUMMARY = CLEAN_LAYOUT.summary;
 const CLEAN_DATE = CLEAN_LAYOUT.date;
 const CLEAN_TITLE = CLEAN_LAYOUT.title;
+const CLEAN_BILL_TO = CLEAN_LAYOUT.billTo;
 const CLEAN_SECTIONS = CLEAN_LAYOUT.sections;
 const CLASSIC_TABLE = CLASSIC_LAYOUT.table;
 const CLASSIC_TOTALS = CLASSIC_LAYOUT.totals;
@@ -829,14 +830,14 @@ function writeCleanDocumentPdf(
     align: "right"
   });
 
-  doc.fillColor("#6D6D6D").font("Helvetica").fontSize(10).text("Bill To:", left, 143);
-  doc.fillColor("#2A2A2A").font("Helvetica-Bold").fontSize(10).text(options.customer.name, left, 162, {
-    width: 230
+  doc.fillColor("#6D6D6D").font("Helvetica").fontSize(10).text("Bill To:", CLEAN_BILL_TO.x, CLEAN_BILL_TO.labelY);
+  doc.fillColor("#2A2A2A").font("Helvetica-Bold").fontSize(10).text(options.customer.name, CLEAN_BILL_TO.x, CLEAN_BILL_TO.nameY, {
+    width: CLEAN_BILL_TO.width
   });
   const customerDetails = joinDocumentText([options.customer.email, options.customer.phone, options.customer.address]);
   if (customerDetails) {
-    doc.fillColor("#6D6D6D").font("Helvetica").fontSize(8).text(customerDetails, left, 182, {
-      width: 230,
+    doc.fillColor("#6D6D6D").font("Helvetica").fontSize(8).text(customerDetails, CLEAN_BILL_TO.x, CLEAN_BILL_TO.detailsY, {
+      width: CLEAN_BILL_TO.width,
       lineGap: 2
     });
   }
@@ -1114,14 +1115,14 @@ function writeCleanPageHeader(
       align: "right"
     });
 
-  doc.fillColor("#6D6D6D").font("Helvetica").fontSize(10).text("Bill To:", 42, 143);
-  doc.fillColor("#2A2A2A").font("Helvetica-Bold").fontSize(10).text(options.customer.name, 42, 162, {
-    width: 230
+  doc.fillColor("#6D6D6D").font("Helvetica").fontSize(10).text("Bill To:", CLEAN_BILL_TO.x, CLEAN_BILL_TO.labelY);
+  doc.fillColor("#2A2A2A").font("Helvetica-Bold").fontSize(10).text(options.customer.name, CLEAN_BILL_TO.x, CLEAN_BILL_TO.nameY, {
+    width: CLEAN_BILL_TO.width
   });
   const customerDetails = joinDocumentText([options.customer.email, options.customer.phone, options.customer.address]);
   if (customerDetails) {
-    doc.fillColor("#6D6D6D").font("Helvetica").fontSize(8).text(customerDetails, 42, 182, {
-      width: 230,
+    doc.fillColor("#6D6D6D").font("Helvetica").fontSize(8).text(customerDetails, CLEAN_BILL_TO.x, CLEAN_BILL_TO.detailsY, {
+      width: CLEAN_BILL_TO.width,
       lineGap: 2
     });
   }

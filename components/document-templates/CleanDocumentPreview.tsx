@@ -164,6 +164,9 @@ export function CleanDocumentPreview({
     width: previewPx(CLEAN_LAYOUT.title.width),
     marginRight: previewPx(CLEAN_LAYOUT.page.rightEdge - CLEAN_LAYOUT.page.rightTextEdge)
   };
+  const billToStyle = {
+    width: previewPx(CLEAN_LAYOUT.billTo.width)
+  };
   const printableItems = items.filter((item) => hasDocumentText(item.description) || numeric(item.lineTotal || item.unitPrice) > 0);
   const displayItems: CleanPreviewItem[] = printableItems.length
     ? printableItems
@@ -220,8 +223,8 @@ export function CleanDocumentPreview({
           </div>
         </div>
 
-        <div className={`${topGap} grid grid-cols-[1fr_1fr] gap-10`}>
-          <div>
+        <div className={`${topGap} flex items-start justify-between`}>
+          <div style={billToStyle}>
             <p className={muted}>Bill To:</p>
             <p className="mt-2 font-bold">{placeholder(customer?.name, "Customer name", previewMode)}</p>
             <p className={`${muted} mt-2 whitespace-pre-line leading-relaxed`}>{placeholder(joinDocumentText([customer?.email, customer?.phone, customer?.address]), "Customer details", previewMode)}</p>
