@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { PageHeader } from "@/components/PageHeader";
 import { StatusPill } from "@/components/StatusPill";
 import { requireUser } from "@/lib/auth";
+import { sanitizeNullablePhoneDisplay } from "@/lib/document-text";
 import { formString, nullableString } from "@/lib/forms";
 import { money, shortDate } from "@/lib/format";
 import { prisma } from "@/lib/prisma";
@@ -17,8 +18,8 @@ async function updateCustomerAction(formData: FormData) {
     data: {
       name: formString(formData, "name"),
       email: nullableString(formData, "email"),
-      phone: nullableString(formData, "phone"),
-      whatsapp: nullableString(formData, "whatsapp"),
+      phone: sanitizeNullablePhoneDisplay(formData.get("phone")),
+      whatsapp: sanitizeNullablePhoneDisplay(formData.get("whatsapp")),
       address: nullableString(formData, "address")
     }
   });

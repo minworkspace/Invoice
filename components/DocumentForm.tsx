@@ -10,6 +10,7 @@ import { ClassicDocumentPreview } from "@/components/document-templates/ClassicD
 import { CleanDocumentPreview } from "@/components/document-templates/CleanDocumentPreview";
 import { FinalPdfPreviewFrame } from "@/components/FinalPdfPreviewFrame";
 import { documentTotal, lineTotal } from "@/lib/document-calculations";
+import { sanitizePhoneDisplay } from "@/lib/document-text";
 
 type CustomerOption = {
   id: string;
@@ -297,7 +298,7 @@ export function DocumentForm({
                 </p>
                 <p>
                   <span className="text-muted">Phone: </span>
-                  {selectedCustomer?.phone || selectedCustomer?.whatsapp || "-"}
+                  {sanitizePhoneDisplay(selectedCustomer?.phone || selectedCustomer?.whatsapp) || "-"}
                 </p>
                 <p className="md:col-span-2">
                   <span className="text-muted">Address: </span>

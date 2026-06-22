@@ -9,7 +9,7 @@ import { companyAssetPublicUrlToAbsolutePath } from "@/lib/logo";
 import { prisma } from "@/lib/prisma";
 import { money, moneyPlain as formatMoneyPlain, shortDate } from "@/lib/format";
 import { deleteFile, saveFile } from "@/lib/storage";
-import { joinDocumentText, sanitizeDocumentText, sanitizeNullableDocumentText } from "@/lib/document-text";
+import { joinDocumentText, sanitizeDocumentText, sanitizeNullableDocumentText, sanitizeNullablePhoneDisplay } from "@/lib/document-text";
 import { A4, CLASSIC_LAYOUT, CLEAN_LAYOUT } from "@/lib/document-layout";
 
 type PdfTarget = {
@@ -993,7 +993,7 @@ function sanitizePdfOptions(options: PdfDocumentOptions): PdfDocumentOptions {
       ...options.company,
       name: sanitizeDocumentText(options.company.name),
       email: sanitizeNullableDocumentText(options.company.email),
-      phone: sanitizeNullableDocumentText(options.company.phone),
+      phone: sanitizeNullablePhoneDisplay(options.company.phone),
       address: sanitizeNullableDocumentText(options.company.address),
       settings: options.company.settings
         ? {
@@ -1006,7 +1006,7 @@ function sanitizePdfOptions(options: PdfDocumentOptions): PdfDocumentOptions {
       ...options.customer,
       name: sanitizeDocumentText(options.customer.name),
       email: sanitizeNullableDocumentText(options.customer.email),
-      phone: sanitizeNullableDocumentText(options.customer.phone),
+      phone: sanitizeNullablePhoneDisplay(options.customer.phone),
       address: sanitizeNullableDocumentText(options.customer.address)
     },
     documentNumber: sanitizeDocumentText(options.documentNumber),

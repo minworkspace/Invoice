@@ -1,5 +1,6 @@
 import { normalizeDocumentTemplateKey } from "@/components/document-templates/template-registry";
 import { requireCompanyUser } from "@/lib/auth";
+import { sanitizeNullablePhoneDisplay } from "@/lib/document-text";
 import { formString, nullableString } from "@/lib/forms";
 import { deleteManagedAssetFile, saveCompanyChop, saveCompanyLogo } from "@/lib/logo";
 import { prisma } from "@/lib/prisma";
@@ -22,7 +23,7 @@ export async function POST(request: Request) {
   const formData = await request.formData();
   const nextCompanyName = formString(formData, "companyName");
   const nextCompanyEmail = nullableString(formData, "companyEmail");
-  const nextCompanyPhone = nullableString(formData, "companyPhone");
+  const nextCompanyPhone = sanitizeNullablePhoneDisplay(formData.get("companyPhone"));
   const nextCompanyAddress = nullableString(formData, "companyAddress");
   const nextSsmNumber = nullableString(formData, "ssmNumber");
   const nextInvoicePrefix = formString(formData, "invoicePrefix", "INV-");

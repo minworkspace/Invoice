@@ -5,7 +5,7 @@ import {
   paginateDocumentItems
 } from "@/lib/document-pagination";
 import { CLASSIC_LAYOUT, PDF_TO_PREVIEW, previewPx } from "@/lib/document-layout";
-import { hasDocumentText, joinDocumentText, sanitizeDocumentText } from "@/lib/document-text";
+import { hasDocumentText, joinDocumentText, sanitizeDocumentText, sanitizePhoneDisplay } from "@/lib/document-text";
 
 type ClassicPreviewCompany = {
   name: string;
@@ -227,13 +227,13 @@ export function ClassicDocumentPreview({
           <p className="mb-2 font-bold" style={{ fontSize: px(14) }}>FROM:</p>
           <p className="font-bold">{placeholder(company.name, "Company name", previewMode)}</p>
           {hasDocumentText(company.ssmNumber) ? <p className="italic">(SSM: {sanitizeDocumentText(company.ssmNumber)})</p> : null}
-          <p className="mt-3 whitespace-pre-line">{placeholder(joinDocumentText([company.email, company.phone, company.address]), "Company details", previewMode)}</p>
+          <p className="mt-3 whitespace-pre-line">{placeholder(joinDocumentText([company.email, sanitizePhoneDisplay(company.phone), company.address]), "Company details", previewMode)}</p>
         </div>
 
         <div className="absolute leading-tight" style={{ left: px(351), top: px(225), width: px(kind === "receipt" ? 220 : 180), fontSize: px(13) }}>
           <p className="mb-2 font-bold" style={{ fontSize: px(14) }}>TO:</p>
           <p className="font-bold">{placeholder(customer?.name, "Customer", previewMode)}</p>
-          <p className="mt-2 whitespace-pre-line">{placeholder(joinDocumentText([customer?.phone, customer?.address]), "Customer details", previewMode)}</p>
+          <p className="mt-2 whitespace-pre-line">{placeholder(joinDocumentText([sanitizePhoneDisplay(customer?.phone), customer?.address]), "Customer details", previewMode)}</p>
         </div>
 
         <div className="absolute leading-tight" style={{ left: px(kind === "receipt" ? 591 : 619), top: px(225), width: px(kind === "receipt" ? 160 : 130), fontSize: px(13) }}>

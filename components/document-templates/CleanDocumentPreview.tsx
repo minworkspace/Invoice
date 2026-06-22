@@ -5,7 +5,7 @@ import {
   paginateDocumentItems
 } from "@/lib/document-pagination";
 import { CLEAN_LAYOUT, PDF_TO_PREVIEW, previewPx } from "@/lib/document-layout";
-import { hasDocumentText, joinDocumentText, sanitizeDocumentText } from "@/lib/document-text";
+import { hasDocumentText, joinDocumentText, sanitizeDocumentText, sanitizePhoneDisplay } from "@/lib/document-text";
 
 type CleanPreviewCompany = {
   name: string;
@@ -214,7 +214,7 @@ export function CleanDocumentPreview({
           <div className="max-w-[300px]">
             <p className="font-bold">{placeholder(company.name, "Company name", previewMode)}</p>
             {hasDocumentText(company.ssmNumber) ? <p className={`${muted} mt-1 italic`}>(SSM: {sanitizeDocumentText(company.ssmNumber)})</p> : null}
-            <p className={`${muted} mt-2 whitespace-pre-line leading-relaxed`}>{placeholder(joinDocumentText([company.email, company.phone, company.address]), "Company details", previewMode)}</p>
+            <p className={`${muted} mt-2 whitespace-pre-line leading-relaxed`}>{placeholder(joinDocumentText([company.email, sanitizePhoneDisplay(company.phone), company.address]), "Company details", previewMode)}</p>
           </div>
 
           <div className="text-right" style={titleBlockStyle}>
@@ -227,7 +227,7 @@ export function CleanDocumentPreview({
           <div style={billToStyle}>
             <p className={muted}>Bill To:</p>
             <p className="mt-2 font-bold">{placeholder(customer?.name, "Customer name", previewMode)}</p>
-            <p className={`${muted} mt-2 whitespace-pre-line leading-relaxed`}>{placeholder(joinDocumentText([customer?.email, customer?.phone, customer?.address]), "Customer details", previewMode)}</p>
+            <p className={`${muted} mt-2 whitespace-pre-line leading-relaxed`}>{placeholder(joinDocumentText([customer?.email, sanitizePhoneDisplay(customer?.phone), customer?.address]), "Customer details", previewMode)}</p>
           </div>
 
           <div>

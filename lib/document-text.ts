@@ -21,6 +21,28 @@ export function sanitizeNullableDocumentText(value: unknown) {
   return text.length ? text : null;
 }
 
+export function sanitizePhoneDisplay(value: unknown) {
+  const text = sanitizeDocumentText(value);
+  if (!text) return "";
+
+  return text
+    .split("\n")
+    .map((line) =>
+      line
+        .trim()
+        .replace(/^[\s"'`,;:*]+/g, "")
+        .replace(/[\s"'`,;:*]+$/g, "")
+        .replace(/\s{2,}/g, " ")
+    )
+    .filter(Boolean)
+    .join("\n");
+}
+
+export function sanitizeNullablePhoneDisplay(value: unknown) {
+  const text = sanitizePhoneDisplay(value);
+  return text.length ? text : null;
+}
+
 export function joinDocumentText(values: unknown[]) {
   return values
     .map((value) => sanitizeDocumentText(value))

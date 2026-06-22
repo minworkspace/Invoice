@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/PageHeader";
 import { requireUser } from "@/lib/auth";
+import { sanitizeNullablePhoneDisplay } from "@/lib/document-text";
 import { formString, nullableString } from "@/lib/forms";
 import { prisma } from "@/lib/prisma";
 
@@ -13,8 +14,8 @@ async function createCustomerAction(formData: FormData) {
       companyId: user.companyId,
       name: formString(formData, "name"),
       email: nullableString(formData, "email"),
-      phone: nullableString(formData, "phone"),
-      whatsapp: nullableString(formData, "whatsapp"),
+      phone: sanitizeNullablePhoneDisplay(formData.get("phone")),
+      whatsapp: sanitizeNullablePhoneDisplay(formData.get("whatsapp")),
       address: nullableString(formData, "address")
     }
   });
