@@ -27,13 +27,20 @@ export function sanitizePhoneDisplay(value: unknown) {
 
   return text
     .split("\n")
-    .map((line) =>
-      line
-        .trim()
-        .replace(/^[\s"'`,;:*]+/g, "")
-        .replace(/[\s"'`,;:*]+$/g, "")
+    .map((line) => {
+      let cleaned = line
+        .replace(/[^\d+()\-\s]/g, " ")
         .replace(/\s{2,}/g, " ")
-    )
+        .trim()
+        .replace(/^[\s-]+/g, "")
+        .replace(/[\s-]+$/g, "");
+
+      if (cleaned.includes("+")) {
+        cleaned = `${cleaned.startsWith("+") ? "+" : ""}${cleaned.replace(/\+/g, "")}`;
+      }
+
+      return cleaned;
+    })
     .filter(Boolean)
     .join("\n");
 }

@@ -12,17 +12,32 @@ async function updateCustomerAction(formData: FormData) {
   "use server";
   const user = await requireUser();
   const id = formString(formData, "id");
+  const nextCustomer = {
+    name: formString(formData, "name"),
+    email: nullableString(formData, "email"),
+    phone: sanitizeNullablePhoneDisplay(formData.get("phone")),
+    whatsapp: sanitizeNullablePhoneDisplay(formData.get("whatsapp")),
+    address: nullableString(formData, "address")
+  };
 
-  await prisma.customer.update({
-    where: { id, companyId: user.companyId },
-    data: {
-      name: formString(formData, "name"),
-      email: nullableString(formData, "email"),
-      phone: sanitizeNullablePhoneDisplay(formData.get("phone")),
-      whatsapp: sanitizeNullablePhoneDisplay(formData.get("whatsapp")),
-      address: nullableString(formData, "address")
-    }
-  });
+  await prisma.$transaction([
+    prisma.customer.update({
+      where: { id, companyId: user.companyId },
+      data: nextCustomer
+    }),
+    prisma.invoice.updateMany({
+      where: { companyId: user.companyId, customerId: id, pdfUrl: { not: null } },
+      data: { pdfNeedsRegeneration: true }
+    }),
+    prisma.quotation.updateMany({
+      where: { companyId: user.companyId, customerId: id, pdfUrl: { not: null } },
+      data: { pdfNeedsRegeneration: true }
+    }),
+    prisma.receipt.updateMany({
+      where: { companyId: user.companyId, customerId: id, pdfUrl: { not: null } },
+      data: { pdfNeedsRegeneration: true }
+    })
+  ]);
 
   redirect(`/customers/${id}`);
 }
